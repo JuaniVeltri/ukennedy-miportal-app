@@ -1,10 +1,12 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/Plata.Host/Plata.Host.csproj" />
+    <Project Path="src/Plata.Motor/Plata.Motor.csproj" />
     <Project Path="src/Plata.MotorApp/Plata.MotorApp.csproj" />
     <Project Path="src/Plata.MotorWasm/Plata.MotorWasm.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Plata.Host.Tests/Plata.Host.Tests.csproj" />
+    <Project Path="tests/Plata.Motor.Tests/Plata.Motor.Tests.csproj" />
   </Folder>
 </Solution>
