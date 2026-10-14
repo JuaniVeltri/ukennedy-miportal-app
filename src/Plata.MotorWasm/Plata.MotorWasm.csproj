@@ -10,5 +10,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Plata.MotorApp\Plata.MotorApp.csproj" />
+    <ProjectReference Include="..\Plata.Motor\Plata.Motor.csproj" />
   </ItemGroup>
 </Project>
