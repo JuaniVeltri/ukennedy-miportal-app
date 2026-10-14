@@ -12,6 +12,7 @@ namespace Plata.Motor.Puente;
 public sealed class CargadorDeApp
 {
     private readonly Dictionary<string, Assembly> _cargadas = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _resolviendo = new(StringComparer.OrdinalIgnoreCase);
     private readonly ReferenceRetargeter _retargeter = new();
     private bool _resolverInstalado;
 
@@ -41,10 +42,16 @@ public sealed class CargadorDeApp
         {
             var nombre = new AssemblyName(e.Name).Name!;
             if (_cargadas.TryGetValue(nombre, out var a)) return a;
-            // BCL de Silverlight (System.Core, System.Xml, etc.) pedida por su
-            // identidad 2.0.5.0: resolverla a la equivalente moderna por nombre.
-            try { return Assembly.Load(new AssemblyName(nombre)); }
+            // Evita recursión infinita: si ya estamos resolviendo este nombre, cortar.
+            if (!_resolviendo.Add(nombre)) return null;
+            try
+            {
+                // BCL de Silverlight (System.Core, System.Xml, etc.) pedida por su
+                // identidad 2.0.5.0: resolverla a la equivalente moderna por nombre.
+                return Assembly.Load(new AssemblyName(nombre));
+            }
             catch { return null; }
+            finally { _resolviendo.Remove(nombre); }
         };
         _resolverInstalado = true;
     }

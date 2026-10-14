@@ -97,3 +97,34 @@ llamada de configuración a sus servicios, que aquí no existen.
 - Stub local de los servicios de configuración de arranque para que no bloquee.
 - Si bloquea por una llamada síncrona, identificarla y cubrir ese hueco en
   OpenSilver / `Plata.Compat`.
+
+## Blocker final localizado: unificación de BCL (2026-10-14, cont.)
+
+Tras blindar el resolvedor contra recursión (el cuelgue era un bucle infinito
+resolviendo `System.Core`) y publicar sin recorte (`PublishTrimmed=false`, para
+que las fachadas de la BCL estén presentes), el motor avanza y falla con un error
+claro y repetible:
+
+- Los ensamblados de GGI referencian tipos de la **BCL de Silverlight**
+  (`System`, `System.Core`, `System.Xml`, … versión 2.0.5.0), por ejemplo
+  `System.ComponentModel.INotifyPropertyChanged` en `System, 2.0.5.0`.
+- En .NET moderno esos tipos viven en **otros ensamblados** (p. ej.
+  `INotifyPropertyChanged` está en `System.ObjectModel`). Resolver el ensamblado
+  por nombre no alcanza porque el **tipo no está donde la referencia lo busca**.
+
+Resolver tipo por tipo no escala. Se necesita una de dos soluciones sistemáticas:
+
+1. **Ensamblados-fachada** con las identidades de Silverlight (`System 2.0.5.0`,
+   `System.Core 2.0.5.0`, …) llenos de `[TypeForwardedTo]` a las ubicaciones
+   modernas. Se generan una vez y se cargan antes que las apps.
+2. **Reescritura de referencias de tipo** (no solo de ensamblado) con Mono.Cecil:
+   redirigir cada `TypeReference` de la BCL de Silverlight al ensamblado moderno
+   correcto.
+
+La opción 1 es la más limpia y la recomendada. Es el núcleo de trabajo que queda.
+
+## Resumen del estado
+
+- Enlace binario y resolución de **tipos de UI (OpenSilver)**: funciona.
+- Carga + resolución + instanciación arranca con la app real.
+- Falta: **unificación de la BCL** (fachadas), que es la próxima pieza grande.
