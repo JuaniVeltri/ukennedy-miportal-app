@@ -1,0 +1,8 @@
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Plata.MotorApp.PantallaDePrueba">
+    <Grid Background="White">
+        <TextBlock Text="Plata motor OK" FontSize="24" Foreground="Black"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Grid>
+</UserControl>

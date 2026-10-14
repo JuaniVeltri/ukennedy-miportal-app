@@ -33,6 +33,20 @@ public class ServidorDeArchivosTests
     }
 
     [Fact]
+    public void Resolver_diferenteMayusculas_encuentraArchivo()
+    {
+        // En Linux/macOS el disco distingue mayúsculas; el motor pide "opensilver.js"
+        // pero el archivo publicado es "OpenSilver.js".
+        var raiz = Directory.CreateTempSubdirectory().FullName;
+        Directory.CreateDirectory(Path.Combine(raiz, "libs"));
+        File.WriteAllText(Path.Combine(raiz, "libs", "OpenSilver.js"), "x");
+        var s = new ServidorDeArchivos(raiz);
+        using var st = s.Resolver("plata://app/libs/opensilver.js", out var ct);
+        Assert.NotNull(st);
+        Assert.Equal("text/javascript", ct);
+    }
+
+    [Fact]
     public void Resolver_raiz_devuelveIndex()
     {
         var raiz = Directory.CreateTempSubdirectory().FullName;
