@@ -6,3 +6,6 @@ obj/
 # .xap reales solo en el corpus de prueba
 *.xap
 !tests/corpus/**/*.xap
+
+# Apps de terceros para prueba local (NO se publican)
+local-corpus/

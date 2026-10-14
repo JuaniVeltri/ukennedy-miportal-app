@@ -1,0 +1,57 @@
+# Análisis de compatibilidad — apps de la Universidad Kennedy
+
+Análisis estático de los `.xap` de la universidad, bajo la autorización en
+[`../autorizacion.md`](../autorizacion.md). Los `.xap` **no** están en el
+repositorio; este documento solo registra su estructura y dependencias.
+
+## Apps
+
+| App | EntryPoint | RuntimeVersion | Librerías |
+|-----|-----------|----------------|-----------|
+| GGI.Academico | `GGI.Academico.UI.Silverlight.App.App` | 3.0.40624.0 (Silverlight 3) | 25 |
+| GGI.CtaCte | `GGI.CtaCte.UI.Silverlight.App.App` | 3.0.40624.0 (Silverlight 3) | 23 |
+
+## Composición de las librerías
+
+Tres grupos:
+
+1. **Código propio de GGI** (lo que hay que correr): `GGI.*.UI.Silverlight.*`
+   y el framework base `Bpf.Silverlight`.
+2. **SDK / Toolkit de Silverlight, incluidos en el `.xap`**:
+   `System.Windows.Controls`, `System.Windows.Controls.Data`,
+   `System.Windows.Controls.Data.Input`, `System.Windows.Controls.Toolkit`,
+   `System.Windows.Controls.Layout.Toolkit`, `System.Windows.Data`,
+   `System.ComponentModel.DataAnnotations`, `System.Xml.Serialization`.
+   OpenSilver provee equivalentes: estas no se cargan del `.xap`, se usan las de
+   OpenSilver.
+3. **Terceros**: `SilverlightContrib`, `SilverlightContrib.Controls`.
+
+## Dependencias de núcleo (lo que el traductor debe mapear)
+
+Todas las librerías dependen del núcleo de Silverlight, que el traductor
+redirige a OpenSilver:
+
+- `System.Windows`, `System.Windows.Browser` → OpenSilver
+- `System.Windows.Controls` (y familia Toolkit/Data) → equivalentes de OpenSilver
+- `System.ServiceModel`, `System.Net`, `System.Runtime.Serialization` →
+  OpenSilver / .NET (los datos llegan por servicios WCF del mismo servidor)
+- `System.Core`, `System.Xml`, `mscorlib` → .NET moderno
+
+## Veredicto de viabilidad
+
+**Favorable.** Son aplicaciones Silverlight de formularios, de la época de
+Silverlight 3, sin dependencias exóticas en la lista: no hay video protegido,
+DRM ni Smooth Streaming. Toda la superficie (XAML, controles del Toolkit,
+DataAnnotations, servicios WCF) es justo lo que OpenSilver apunta a cubrir.
+
+El único componente de terceros fuera del SDK es **SilverlightContrib**, que es
+open source; si usa algo que OpenSilver no tiene, se cubre en `Plata.Compat`.
+
+## Próximo paso (go/no-go real)
+
+Integrar en el motor WASM la carga dinámica: `XapReader` → descartar las
+librerías del SDK incluidas → `ReferenceRetargeter` sobre las de GGI y terceros →
+`Assembly.Load` → instanciar el EntryPoint → `RootVisual` → render. Falta
+precisar, en OpenSilver, a qué ensamblado concreto apunta cada tipo del SDK
+(OpenSilver.Controls, OpenSilver.Controls.Data, etc.) para que el traductor no
+redirija a un ensamblado único equivocado.
