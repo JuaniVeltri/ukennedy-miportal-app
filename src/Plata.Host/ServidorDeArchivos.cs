@@ -23,8 +23,23 @@ public sealed class ServidorDeArchivos(string raiz)
             !destino.StartsWith(_raiz + Path.DirectorySeparatorChar, StringComparison.Ordinal))
             return null;
 
-        if (!File.Exists(destino)) return null;
+        destino = ResolverSinDistinguirMayusculas(destino);
+        if (destino is null) return null;
         contentType = TiposDeContenido.Para(destino);
         return File.OpenRead(destino);
+    }
+
+    // Linux/macOS distinguen mayúsculas en el disco; el motor pide archivos con
+    // una capitalización distinta a la publicada (p. ej. "opensilver.js" vs "OpenSilver.js").
+    private static string? ResolverSinDistinguirMayusculas(string destino)
+    {
+        if (File.Exists(destino)) return destino;
+        var dir = Path.GetDirectoryName(destino);
+        if (dir is null || !Directory.Exists(dir)) return null;
+        var nombre = Path.GetFileName(destino);
+        foreach (var f in Directory.EnumerateFiles(dir))
+            if (string.Equals(Path.GetFileName(f), nombre, StringComparison.OrdinalIgnoreCase))
+                return f;
+        return null;
     }
 }
