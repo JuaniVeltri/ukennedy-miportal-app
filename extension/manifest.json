@@ -1,0 +1,17 @@
+{
+  "manifest_version": 3,
+  "name": "Plata — compatible con Silverlight",
+  "version": "0.1.0",
+  "description": "Detecta aplicaciones Silverlight en una página y las abre con el reproductor Plata (Mac, Linux, Windows).",
+  "icons": { "128": "icono.png" },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["detector.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    { "resources": ["aviso.css"], "matches": ["<all_urls>"] }
+  ]
+}
