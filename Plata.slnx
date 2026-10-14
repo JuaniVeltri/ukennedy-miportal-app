@@ -2,4 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/Plata.Host/Plata.Host.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Plata.Host.Tests/Plata.Host.Tests.csproj" />
+  </Folder>
 </Solution>
