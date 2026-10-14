@@ -44,8 +44,14 @@ namespace Plata.MotorWasm.Pages
                 var pkg = XapReader.Leer(new System.IO.MemoryStream(bytes));
                 var tipoEntrada = new CargadorDeApp().CargarTipoDeEntrada(pkg);
                 await Avisar("plata:cargado " + tipoEntrada.FullName);
-                await Runner.RunApplicationAsync(() => (Application)Activator.CreateInstance(tipoEntrada)!);
-                await Avisar("plata:corriendo");
+                await Runner.RunApplicationAsync(() =>
+                {
+                    AvisarInterop("plata:instanciando-en-runner");
+                    var app = (Application)Activator.CreateInstance(tipoEntrada)!;
+                    AvisarInterop("plata:instanciado rootvisual=" +
+                        (app.RootVisual?.GetType().FullName ?? "null"));
+                    return app;
+                });
             }
             catch (Exception ex)
             {
@@ -57,6 +63,11 @@ namespace Plata.MotorWasm.Pages
 
         private async Task Avisar(string m)
             => await JS.InvokeVoidAsync("window.external.sendMessage", m);
+
+        // Reporte síncrono desde dentro del arranque de OpenSilver (donde su interop ya existe).
+        private static void AvisarInterop(string m)
+            => OpenSilver.Interop.ExecuteJavaScriptVoid(
+                "window.external.sendMessage(" + System.Text.Json.JsonSerializer.Serialize(m) + ")");
 
         private static string? ParametroXap(string href)
         {
