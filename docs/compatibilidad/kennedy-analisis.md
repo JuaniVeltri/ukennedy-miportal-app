@@ -152,3 +152,17 @@ entre OpenSilver y Silverlight real. Se resuelven de a una, por:
 
 Progreso del arranque: carga ✓ · BCL ✓ · enlace de tipos UI ✓ · entra al ctor
 base de la app ✓ · falla en `Application.Exit` (firma).
+
+## Puente completo; frontera = arranque de la app (2026-10-14)
+
+Parche acotado (SaltearApiAusente) que anula la suscripcion a Application.Exit
+(firma distinta en OpenSilver, prescindible en un visor). Con eso el constructor
+de la App completa sin error y OpenSilver engancha su raiz en el DOM
+(#opensilver-root con 2 hijos). El puente (carga -> BCL -> enlace de tipos UI ->
+construccion -> runtime OpenSilver vivo) funciona end-to-end con la app real.
+
+Falta para ver la interfaz: el arranque propio de la app (Application_Startup ->
+Shell.Instance.Start, ApplicationSettings, roles, servicios) necesita sus
+InitParams (InitialConfiguration), configuracion y servicios, ausentes en prueba.
+Proximos pasos: (1) InitParams representativos; (2) stub de servicios de arranque;
+(3) mas parches de API puntuales de OpenSilver segun aparezcan.
