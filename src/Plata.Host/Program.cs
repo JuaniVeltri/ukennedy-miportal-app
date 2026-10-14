@@ -16,9 +16,9 @@ var win = new PhotinoWindow()
     })
     .RegisterWebMessageReceivedHandler((_, m) =>
     {
-        if (m == "plata:listo") Console.WriteLine("motor listo");
+        Console.WriteLine("MSG " + m);
     })
-    .Load(new Uri("plata://app/"));
+    .Load(new Uri("plata://app/" + (ArgOf(args, "--xap") is { } x ? "?xap=" + Uri.EscapeDataString(x) : "")));
 
 win.WaitForClose();
 
