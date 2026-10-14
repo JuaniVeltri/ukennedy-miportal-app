@@ -74,3 +74,26 @@ era la incógnita, funciona.
 
 Aprendizaje a incorporar al motor: hace falta un resolvedor de ensamblados que
 sirva las librerías cargadas por bytes a las referencias por nombre.
+
+## Render en WASM — hasta dónde llega (2026-10-14)
+
+Ejecutando el `.xap` real dentro del motor WASM (OpenSilver), con mensajes de
+diagnóstico, la secuencia llega hasta:
+
+1. `init` ✓
+2. baja el `.xap` (1.333.240 B) ✓
+3. carga las 13 librerías y **resuelve el tipo de entrada** `...App.App` ✓
+4. entra al arranque de OpenSilver e **invoca el constructor de la App** ✓
+5. el **constructor de la App no retorna** (se cuelga, sin excepción); la zona de
+   render (`#opensilver-root`) queda vacía (kids=0) tras +120 s.
+
+**Interpretación:** el enlace binario y la resolución de tipos funcionan con la
+app real. El bloqueo está en el **arranque propio de la app GGI/Bpf**: lo más
+probable es que espere sus `InitParams` (incluye `InitialConfiguration`) y/o una
+llamada de configuración a sus servicios, que aquí no existen.
+
+**Próximos pasos (iterativo, varias sesiones):**
+- Pasar `InitParams` representativos al arranque (`StartupEventArgs`).
+- Stub local de los servicios de configuración de arranque para que no bloquee.
+- Si bloquea por una llamada síncrona, identificarla y cubrir ese hueco en
+  OpenSilver / `Plata.Compat`.
