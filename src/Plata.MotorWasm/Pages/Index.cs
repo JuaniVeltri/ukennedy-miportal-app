@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
 using Microsoft.JSInterop;
 using System;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Windows;
@@ -63,7 +64,8 @@ namespace Plata.MotorWasm.Pages
                     {
                         var r = ev.ExceptionObject;
                         while (r?.InnerException is not null) r = r.InnerException;
-                        AvisarInterop("plata:startup-error " + r?.GetType().Name + ": " + r?.Message);
+                        AvisarInterop("plata:startup-error " + r?.GetType().Name + ": " + r?.Message
+                            + " @ " + string.Join(" | ", (r?.StackTrace ?? "").Split('\n').Take(8).Select(l => l.Trim())));
                     };
                     AvisarInterop("plata:instanciado rootvisual=" +
                         (app.RootVisual?.GetType().FullName ?? "null"));

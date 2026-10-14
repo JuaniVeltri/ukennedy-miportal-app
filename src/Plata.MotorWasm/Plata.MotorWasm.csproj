@@ -5,6 +5,8 @@
     <DisableImplicitNamespaceImports>true</DisableImplicitNamespaceImports>
     <!-- Sin recorte: las apps se cargan dinámicamente, el recorte no las "ve". -->
     <PublishTrimmed>false</PublishTrimmed>
+    <BlazorWebAssemblyEnableLinking>false</BlazorWebAssemblyEnableLinking>
+    <TrimMode>partial</TrimMode>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.0" />
