@@ -128,3 +128,27 @@ La opción 1 es la más limpia y la recomendada. Es el núcleo de trabajo que qu
 - Enlace binario y resolución de **tipos de UI (OpenSilver)**: funciona.
 - Carga + resolución + instanciación arranca con la app real.
 - Falta: **unificación de la BCL** (fachadas), que es la próxima pieza grande.
+
+## Unificación BCL resuelta; ahora: desviaciones de API de OpenSilver (2026-10-14)
+
+Implementada la unificación de BCL en `ReferenceRetargeter` (reescribe cada
+referencia de tipo de la BCL de Silverlight —System, System.Core, System.Xml,
+System.Net, System.Runtime.Serialization, System.ComponentModel.DataAnnotations—
+al ensamblado moderno que exporta el tipo, resuelto en runtime). El error de
+`INotifyPropertyChanged` desapareció.
+
+Ahora el motor entra al **constructor base de la app** (`BaseApplication`) y falla
+en una **desviación de API de OpenSilver**:
+
+- `MissingMethodException: System.Windows.Application.add_Exit(System.EventHandler)`.
+- En Silverlight real, `Application.Exit` es `event EventHandler`. OpenSilver lo
+  declara como `event ExitEventHandler`. GGI, compilado contra Silverlight, llama
+  `add_Exit(EventHandler)`, que OpenSilver no tiene.
+
+Este es el tipo de hueco esperado de aquí en más: desviaciones puntuales de API
+entre OpenSilver y Silverlight real. Se resuelven de a una, por:
+- corrección en OpenSilver (upstream), o
+- reescritura dirigida del sitio de llamada en el traductor.
+
+Progreso del arranque: carga ✓ · BCL ✓ · enlace de tipos UI ✓ · entra al ctor
+base de la app ✓ · falla en `Application.Exit` (firma).

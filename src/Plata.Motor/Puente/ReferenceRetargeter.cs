@@ -4,30 +4,91 @@ using Mono.Cecil;
 namespace Plata.Motor.Puente;
 
 /// <summary>
-/// Reescribe, en memoria, las referencias de ensamblado de una librería compilada
-/// para Silverlight de modo que apunten a OpenSilver. Las referencias que no son de
-/// Silverlight quedan intactas.
+/// Reescribe, en memoria, una librería compilada para Silverlight para que corra
+/// sobre OpenSilver y la BCL moderna:
+///  - referencias a ensamblados de UI de Silverlight → OpenSilver;
+///  - referencias de tipo de la BCL de Silverlight (System, System.Core, …) →
+///    el ensamblado moderno de .NET que realmente contiene cada tipo.
 /// </summary>
 public sealed class ReferenceRetargeter
 {
     private static readonly Version OpenSilverVersion = new(3, 3, 3, 0);
+
+    // BCL de Silverlight cuyos tipos hay que reubicar en .NET moderno (sin mscorlib:
+    // su fachada moderna ya reenvía los tipos del núcleo por nombre).
+    private static readonly HashSet<string> BclAUnificar = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "System", "System.Core", "System.Xml", "System.Net",
+        "System.Runtime.Serialization", "System.ComponentModel.DataAnnotations",
+    };
+
+    // Caché global: nombre completo de tipo → ensamblado moderno que lo exporta.
+    private static readonly Dictionary<string, string?> _modernaDeTipo = new(StringComparer.Ordinal);
 
     public byte[] Traducir(byte[] ensamblado, out IReadOnlyList<string> referenciasReescritas)
     {
         var reescritas = new List<string>();
         using var mod = ModuleDefinition.ReadModule(new MemoryStream(ensamblado));
 
+        var cambiado = UnificarBcl(mod);
+        cambiado |= RedirigirUiAOpenSilver(mod, reescritas);
+
+        referenciasReescritas = reescritas;
+        if (!cambiado) return ensamblado;
+
+        using var salida = new MemoryStream();
+        mod.Write(salida);
+        return salida.ToArray();
+    }
+
+    // Reubica cada referencia de tipo de la BCL de Silverlight al ensamblado moderno.
+    private static bool UnificarBcl(ModuleDefinition mod)
+    {
+        var refsModernas = new Dictionary<string, AssemblyNameReference>(StringComparer.Ordinal);
+        var cambiado = false;
+
+        foreach (var t in mod.GetTypeReferences())
+        {
+            if (t.Scope is not AssemblyNameReference an || !BclAUnificar.Contains(an.Name)) continue;
+            var moderna = ModernaDeTipo(t.FullName.Replace('/', '+'));
+            if (moderna is null || moderna == an.Name) continue;
+
+            if (!refsModernas.TryGetValue(moderna, out var nueva))
+            {
+                nueva = mod.AssemblyReferences.FirstOrDefault(a => a.Name == moderna)
+                        ?? new AssemblyNameReference(moderna, new Version(0, 0, 0, 0));
+                if (!mod.AssemblyReferences.Contains(nueva)) mod.AssemblyReferences.Add(nueva);
+                refsModernas[moderna] = nueva;
+            }
+            t.Scope = nueva;
+            cambiado = true;
+        }
+        return cambiado;
+    }
+
+    private static string? ModernaDeTipo(string fullName)
+    {
+        if (_modernaDeTipo.TryGetValue(fullName, out var cache)) return cache;
+        Type? tipo = Type.GetType(fullName);
+        if (tipo is null)
+            foreach (var asm in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try { tipo = asm.GetType(fullName); } catch { tipo = null; }
+                if (tipo is not null) break;
+            }
+        var nombre = tipo?.Assembly.GetName().Name;
+        _modernaDeTipo[fullName] = nombre;
+        return nombre;
+    }
+
+    // System.Windows* (UI de Silverlight) → OpenSilver.
+    private static bool RedirigirUiAOpenSilver(ModuleDefinition mod, List<string> reescritas)
+    {
         var aRedirigir = mod.AssemblyReferences
             .Where(a => MapaDeEnsamblados.Destino(a.Name) == "OpenSilver")
             .ToList();
+        if (aRedirigir.Count == 0) return false;
 
-        if (aRedirigir.Count == 0)
-        {
-            referenciasReescritas = reescritas;
-            return ensamblado;
-        }
-
-        // Una sola referencia a OpenSilver: reusar si ya existe, si no renombrar la primera.
         var osRef = mod.AssemblyReferences.FirstOrDefault(a => a.Name == "OpenSilver");
         if (osRef is null)
         {
@@ -39,7 +100,6 @@ public sealed class ReferenceRetargeter
             aRedirigir.RemoveAt(0);
         }
 
-        // El resto de referencias redirigibles se eliminan y sus tipos se reapuntan a osRef.
         foreach (var r in aRedirigir)
         {
             reescritas.Add(r.Name);
@@ -47,10 +107,6 @@ public sealed class ReferenceRetargeter
                 if (ReferenceEquals(t.Scope, r)) t.Scope = osRef;
             mod.AssemblyReferences.Remove(r);
         }
-
-        using var salida = new MemoryStream();
-        mod.Write(salida);
-        referenciasReescritas = reescritas;
-        return salida.ToArray();
+        return true;
     }
 }
