@@ -21,6 +21,13 @@ public sealed class ReferenceRetargeter
     {
         "System", "System.Core", "System.Xml", "System.Net",
         "System.Runtime.Serialization", "System.ComponentModel.DataAnnotations",
+        // UI de Silverlight: cada tipo se reubica en el ensamblado OpenSilver real
+        // que lo exporta (p. ej. HtmlPage vive en OpenSilver.Browser, no en OpenSilver).
+        "System.Windows", "System.Windows.Browser", "System.Windows.Controls",
+        "System.Windows.Controls.Data", "System.Windows.Controls.Data.Input",
+        "System.Windows.Controls.Navigation", "System.Windows.Controls.Toolkit",
+        "System.Windows.Controls.Layout.Toolkit", "System.Windows.Controls.Input.Toolkit",
+        "System.Windows.Controls.DataVisualization.Toolkit", "System.Windows.Data",
     };
 
     // Caché global: nombre completo de tipo → ensamblado moderno que lo exporta.
