@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 using Mono.Cecil;
+using Mono.Cecil.Cil;
 
 namespace Plata.Motor.Puente;
 
@@ -32,6 +33,7 @@ public sealed class ReferenceRetargeter
 
         var cambiado = UnificarBcl(mod);
         cambiado |= RedirigirUiAOpenSilver(mod, reescritas);
+        cambiado |= SaltearApiAusente(mod);
 
         referenciasReescritas = reescritas;
         if (!cambiado) return ensamblado;
@@ -63,6 +65,36 @@ public sealed class ReferenceRetargeter
             t.Scope = nueva;
             cambiado = true;
         }
+        return cambiado;
+    }
+
+    // Métodos de OpenSilver con firma distinta a Silverlight que la app llama y
+    // cuyo efecto es prescindible en un visor: se anula la llamada (pop de args).
+    private static readonly HashSet<string> MetodosASaltear = new(StringComparer.Ordinal)
+    {
+        "System.Windows.Application::add_Exit",
+        "System.Windows.Application::remove_Exit",
+    };
+
+    private static bool SaltearApiAusente(ModuleDefinition mod)
+    {
+        var cambiado = false;
+        foreach (var tipo in mod.GetTypes())
+            foreach (var m in tipo.Methods)
+            {
+                if (!m.HasBody) continue;
+                var il = m.Body.GetILProcessor();
+                foreach (var instr in m.Body.Instructions.ToList())
+                {
+                    if (instr.Operand is not MethodReference mr) continue;
+                    if (!MetodosASaltear.Contains(mr.DeclaringType.FullName + "::" + mr.Name)) continue;
+                    // add_Exit(this, delegate) -> void: descartar los 2 valores de la pila.
+                    var pop1 = Instruction.Create(OpCodes.Pop);
+                    il.Replace(instr, pop1);
+                    il.InsertAfter(pop1, Instruction.Create(OpCodes.Pop));
+                    cambiado = true;
+                }
+            }
         return cambiado;
     }
 
