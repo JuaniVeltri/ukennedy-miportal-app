@@ -55,3 +55,22 @@ librerías del SDK incluidas → `ReferenceRetargeter` sobre las de GGI y tercer
 precisar, en OpenSilver, a qué ensamblado concreto apunta cada tipo del SDK
 (OpenSilver.Controls, OpenSilver.Controls.Data, etc.) para que el traductor no
 redirija a un ensamblado único equivocado.
+
+## Resultado del go/no-go (2026-10-14)
+
+Prueba real con `GGI.Academico.UI.Silverlight.App.xap` (local, no versionado),
+usando `XapReader` + `PlanDeCarga` + `ReferenceRetargeter` de este repo:
+
+- **Las 13 librerías de GGI y terceros cargan** tras reescribir sus referencias
+  de Silverlight a OpenSilver (`Assembly.Load` OK en todas).
+- Con un resolvedor de ensamblados (`AppDomain.AssemblyResolve` que devuelve las
+  cargadas por bytes), **el tipo de entrada `GGI.Academico.UI.Silverlight.App.App`
+  resuelve correctamente** contra OpenSilver.
+
+**Veredicto: GO.** La resolución de tipos —el riesgo principal del proyecto— se
+cumple con las apps reales. Falta instanciar y renderizar dentro del runtime WASM
+de OpenSilver (el contexto de ejecución real); la parte de enlace binario, que
+era la incógnita, funciona.
+
+Aprendizaje a incorporar al motor: hace falta un resolvedor de ensamblados que
+sirva las librerías cargadas por bytes a las referencias por nombre.
