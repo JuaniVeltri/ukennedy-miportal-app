@@ -42,12 +42,29 @@ namespace Plata.MotorWasm.Pages
                 var bytes = await http.GetByteArrayAsync(absoluta);
                 await Avisar("plata:bajado " + bytes.Length + "B");
                 var pkg = XapReader.Leer(new System.IO.MemoryStream(bytes));
+                // Cargar los satélites de OpenSilver para que el traductor pueda
+                // reubicar cada tipo de UI en el ensamblado que realmente lo exporta.
+                foreach (var n in new[]
+                {
+                    "OpenSilver.Browser", "OpenSilver.Controls", "OpenSilver.Controls.Data",
+                    "OpenSilver.Controls.Input", "OpenSilver.Controls.Navigation",
+                    "OpenSilver.Controls.Toolkit", "OpenSilver.Controls.Data.Input",
+                    "OpenSilver.Controls.Layout.Toolkit", "OpenSilver.Controls.Input.Toolkit",
+                    "OpenSilver.Controls.DataVisualization.Toolkit",
+                })
+                    try { System.Reflection.Assembly.Load(n); } catch { }
                 var tipoEntrada = new CargadorDeApp().CargarTipoDeEntrada(pkg);
                 await Avisar("plata:cargado " + tipoEntrada.FullName);
                 await Runner.RunApplicationAsync(() =>
                 {
                     AvisarInterop("plata:instanciando-en-runner");
                     var app = (Application)Activator.CreateInstance(tipoEntrada)!;
+                    app.UnhandledException += (_, ev) =>
+                    {
+                        var r = ev.ExceptionObject;
+                        while (r?.InnerException is not null) r = r.InnerException;
+                        AvisarInterop("plata:startup-error " + r?.GetType().Name + ": " + r?.Message);
+                    };
                     AvisarInterop("plata:instanciado rootvisual=" +
                         (app.RootVisual?.GetType().FullName ?? "null"));
                     return app;
