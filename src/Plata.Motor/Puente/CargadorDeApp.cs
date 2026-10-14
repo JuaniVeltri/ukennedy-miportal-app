@@ -40,7 +40,11 @@ public sealed class CargadorDeApp
         AppDomain.CurrentDomain.AssemblyResolve += (_, e) =>
         {
             var nombre = new AssemblyName(e.Name).Name!;
-            return _cargadas.TryGetValue(nombre, out var a) ? a : null;
+            if (_cargadas.TryGetValue(nombre, out var a)) return a;
+            // BCL de Silverlight (System.Core, System.Xml, etc.) pedida por su
+            // identidad 2.0.5.0: resolverla a la equivalente moderna por nombre.
+            try { return Assembly.Load(new AssemblyName(nombre)); }
+            catch { return null; }
         };
         _resolverInstalado = true;
     }

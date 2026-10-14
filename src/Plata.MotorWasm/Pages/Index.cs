@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.JSInterop;
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -13,6 +14,8 @@ namespace Plata.MotorWasm.Pages
     [Route("/")]
     public class Index : ComponentBase
     {
+        [Inject] public IJSRuntime JS { get; set; } = default!;
+
         protected override void BuildRenderTree(RenderTreeBuilder __builder)
         {
         }
@@ -20,11 +23,12 @@ namespace Plata.MotorWasm.Pages
         protected async override Task OnInitializedAsync()
         {
             await base.OnInitializedAsync();
-            Avisar("plata:init");
+            await Avisar("plata:init");
 
-            // ?xap=<ruta relativa al host> ejecuta una app Silverlight; sin él, la pantalla de prueba.
-            var xap = ParametroXap();
-            Avisar("plata:xap=" + (xap ?? "null"));
+            var href = await JS.InvokeAsync<string>("eval", "window.location.href");
+            var xap = ParametroXap(href);
+            await Avisar("plata:xap=" + (xap ?? "null"));
+
             if (xap is null)
             {
                 await Runner.RunApplicationAsync<Plata.MotorApp.App>();
@@ -34,28 +38,30 @@ namespace Plata.MotorWasm.Pages
             try
             {
                 using var http = new HttpClient();
-                var bytes = await http.GetByteArrayAsync(xap);
+                var absoluta = new Uri(new Uri(href), xap); // plata://app/ + ruta relativa
+                var bytes = await http.GetByteArrayAsync(absoluta);
+                await Avisar("plata:bajado " + bytes.Length + "B");
                 var pkg = XapReader.Leer(new System.IO.MemoryStream(bytes));
                 var tipoEntrada = new CargadorDeApp().CargarTipoDeEntrada(pkg);
-                Avisar("plata:cargado " + tipoEntrada.FullName);
+                await Avisar("plata:cargado " + tipoEntrada.FullName);
                 await Runner.RunApplicationAsync(() => (Application)Activator.CreateInstance(tipoEntrada)!);
-                Avisar("plata:corriendo");
+                await Avisar("plata:corriendo");
             }
             catch (Exception ex)
             {
-                Avisar("plata:error " + ex.GetType().Name + ": " + ex.Message);
+                var raiz = ex;
+                while (raiz.InnerException is not null) raiz = raiz.InnerException;
+                await Avisar("plata:error " + raiz.GetType().Name + ": " + raiz.Message);
             }
         }
 
-        private static void Avisar(string m)
-            => OpenSilver.Interop.ExecuteJavaScriptVoid(
-                "if(window.external&&window.external.sendMessage)window.external.sendMessage(" +
-                System.Text.Json.JsonSerializer.Serialize(m) + ")");
+        private async Task Avisar(string m)
+            => await JS.InvokeVoidAsync("window.external.sendMessage", m);
 
-        private static string? ParametroXap()
+        private static string? ParametroXap(string href)
         {
-            var q = new Uri(OpenSilver.Interop.ExecuteJavaScriptGetResult<string>("window.location.href")).Query;
-            foreach (var par in q.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries))
+            var q = new Uri(href).Query.TrimStart('?');
+            foreach (var par in q.Split('&', StringSplitOptions.RemoveEmptyEntries))
             {
                 var kv = par.Split('=', 2);
                 if (kv.Length == 2 && kv[0] == "xap") return Uri.UnescapeDataString(kv[1]);
