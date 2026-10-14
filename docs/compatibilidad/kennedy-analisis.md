@@ -166,3 +166,24 @@ Shell.Instance.Start, ApplicationSettings, roles, servicios) necesita sus
 InitParams (InitialConfiguration), configuracion y servicios, ausentes en prueba.
 Proximos pasos: (1) InitParams representativos; (2) stub de servicios de arranque;
 (3) mas parches de API puntuales de OpenSilver segun aparezcan.
+
+## Arranque llega a la configuración de la app (2026-10-14, cont. 3)
+
+- Los `MissingMethod` de la BCL (`Convert.ToDecimal`, `XmlReader.ReadToFollowing`)
+  **no eran un problema de enlace**: eran un `obj/` viejo publicado con recorte
+  (el runtime tenía la BCL recortada). Publicando limpio y sin recorte desaparecen;
+  hay que borrar `obj/` al cambiar `PublishTrimmed`.
+- Se quitan los atributos de ensamblado exclusivos de Silverlight
+  (`AssemblyTrademarkAttribute`), que el runtime moderno no puede leer
+  (`QuitarAtributosInexistentes`).
+- `Application_Startup` → `Shell.Start` llega a
+  `ConfigurationManagerFactory.CreateConfigurationManagerFactory(InitialConfiguration)`
+  y falla con `NullReferenceException`: la app necesita el parámetro de inicio
+  `InitialConfiguration` (JSON `{"Data":"<xml con ConfigurationManagerFactory,
+  servicios WCF, ...>"}`) que genera el servidor para cada sesión en
+  `Launcher.aspx`.
+
+**Frontera actual:** sin el `initParams` real de la sesión del alumno no se puede
+seguir. El portal no lo entrega a clientes Linux/Mac (bloqueo por sistema operativo
+en el servidor), por lo que el siguiente paso real requiere que el portal lo
+permita (pedido a Sistemas) o un `initParams` de prueba provisto por la universidad.

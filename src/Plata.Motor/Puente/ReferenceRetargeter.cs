@@ -41,6 +41,7 @@ public sealed class ReferenceRetargeter
         var cambiado = UnificarBcl(mod);
         cambiado |= RedirigirUiAOpenSilver(mod, reescritas);
         cambiado |= SaltearApiAusente(mod);
+        cambiado |= QuitarAtributosInexistentes(mod);
 
         referenciasReescritas = reescritas;
         if (!cambiado) return ensamblado;
@@ -101,6 +102,23 @@ public sealed class ReferenceRetargeter
                     il.InsertAfter(pop1, Instruction.Create(OpCodes.Pop));
                     cambiado = true;
                 }
+            }
+        return cambiado;
+    }
+
+    // Atributos de ensamblado/módulo propios de Silverlight (p. ej. AssemblyTrademark)
+    // que no existen en .NET moderno: el runtime falla al leerlos, y no aportan nada.
+    private static bool QuitarAtributosInexistentes(ModuleDefinition mod)
+    {
+        var cambiado = false;
+        foreach (var provider in new ICustomAttributeProvider[] { mod.Assembly, mod })
+            for (var i = provider.CustomAttributes.Count - 1; i >= 0; i--)
+            {
+                var tipo = provider.CustomAttributes[i].AttributeType;
+                if (tipo.Scope is not AssemblyNameReference an || !BclAUnificar.Contains(an.Name)) continue;
+                if (ModernaDeTipo(tipo.FullName.Replace('/', '+')) is not null) continue;
+                provider.CustomAttributes.RemoveAt(i);
+                cambiado = true;
             }
         return cambiado;
     }
