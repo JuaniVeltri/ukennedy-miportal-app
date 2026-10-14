@@ -1,0 +1,10 @@
+<Project>
+  <PropertyGroup>
+    <PlataPhotinoVersion>4.0.16</PlataPhotinoVersion>
+    <PlataOpenSilverVersion>3.3.3</PlataOpenSilverVersion>
+    <PlataCecilVersion>0.11.6</PlataCecilVersion>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

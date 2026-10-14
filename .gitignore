@@ -1,0 +1,8 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+# .xap reales solo en el corpus de prueba
+*.xap
+!tests/corpus/**/*.xap
