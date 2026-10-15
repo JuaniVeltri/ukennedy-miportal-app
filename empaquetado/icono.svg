@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- SPDX-License-Identifier: MIT -->
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a3f47"/><stop offset="1" stop-color="#23272c"/>
+    </linearGradient>
+    <radialGradient id="plata" cx=".35" cy=".3" r=".75">
+      <stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#c9ced4"/><stop offset="1" stop-color="#7b828b"/>
+    </radialGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="26" fill="url(#fondo)"/>
+  <circle cx="64" cy="66" r="40" fill="url(#plata)"/>
+  <!-- birrete -->
+  <path d="M64 44 30 58l34 14 34-14z" fill="#2b2f35"/>
+  <path d="M44 64v12c0 6 9 11 20 11s20-5 20-11V64l-20 8z" fill="#2b2f35"/>
+  <path d="M93 60v16" stroke="#2b2f35" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="93" cy="79" r="3.5" fill="#2b2f35"/>
+</svg>

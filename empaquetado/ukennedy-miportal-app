@@ -1,0 +1,11 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Abre la app: MiPortal de la Universidad Kennedy dentro de Plata (ver README).
+# Presentarse como Windows ante el portal está autorizado por la universidad (docs/autorizacion.md).
+DIR=$(dirname "$(readlink -f "$0")")
+exec "$DIR/app/Plata.Host" \
+  --nombre "Universidad Kennedy MiPortal App (no oficial)" \
+  --repo "https://github.com/JuaniVeltri/ukennedy-miportal-app" \
+  --portal "https://miportal.kennedy.edu.ar/" --portal-nombre "MiPortal" \
+  --permitir "kennedy.edu.ar" \
+  "$@"
