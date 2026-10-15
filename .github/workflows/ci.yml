@@ -34,3 +34,42 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         working-directory: extension
         run: node --test
+
+  # Paquetes para probar cada cambio: se bajan desde la página de la ejecución (Artifacts).
+  paquete-macos:
+    name: Paquete de macOS (Apple Silicon)
+    needs: compilar-y-probar
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Carga de trabajo de WebAssembly
+        run: dotnet workload install wasm-tools
+      - name: Armar el .dmg
+        run: empaquetado/macos/empaquetar.sh 0.1.0 arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ukennedy-miportal-app-macos-arm64
+          path: dist/*.dmg
+          retention-days: 14
+
+  paquete-linux:
+    name: Paquete de Linux
+    needs: compilar-y-probar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Carga de trabajo de WebAssembly
+        run: dotnet workload install wasm-tools
+      - name: Armar el .tar.gz
+        run: empaquetado/linux/empaquetar.sh 0.1.0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ukennedy-miportal-app-linux-x64
+          path: dist/*.tar.gz
+          retention-days: 14

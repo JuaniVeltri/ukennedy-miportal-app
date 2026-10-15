@@ -28,3 +28,21 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.tar.gz \
             --title "$GITHUB_REF_NAME" --generate-notes
+
+  macos:
+    name: Paquete de macOS (Apple Silicon)
+    needs: linux
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Carga de trabajo de WebAssembly
+        run: dotnet workload install wasm-tools
+      - name: Armar el .dmg
+        run: empaquetado/macos/empaquetar.sh "${GITHUB_REF_NAME#v}" arm64
+      - name: Sumarlo a la versión
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/*.dmg

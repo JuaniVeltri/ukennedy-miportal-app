@@ -1,0 +1,14 @@
+# Argumentos de Universidad Kennedy MiPortal App (no oficial). El host los lee al arrancar.
+# Presentarse como Windows ante el portal está autorizado por la universidad.
+--nombre
+Universidad Kennedy MiPortal App (no oficial)
+--repo
+https://github.com/JuaniVeltri/ukennedy-miportal-app
+--portal
+https://miportal.kennedy.edu.ar/
+--portal-nombre
+MiPortal
+--permitir
+kennedy.edu.ar
+--icono
+icono.png
