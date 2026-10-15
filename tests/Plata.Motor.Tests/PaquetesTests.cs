@@ -27,10 +27,13 @@ public class PaquetesTests
     public async Task WebClient_relativaAlXap_bajaPorElPorteroYAvisa()
     {
         var pedidas = new List<string>();
-        Portero.Enviar = p =>
+        // La respuesta espera a que la prueba vea la descarga en curso (si no, puede terminar antes).
+        var responder = new TaskCompletionSource();
+        Portero.Enviar = async p =>
         {
             pedidas.Add(p.Metodo + " " + p.Url);
-            return Task.FromResult(new RespuestaHttp(200, Array.Empty<(string, string)>(), Encoding.UTF8.GetBytes("paquete")));
+            await responder.Task;
+            return new RespuestaHttp(200, Array.Empty<(string, string)>(), Encoding.UTF8.GetBytes("paquete"));
         };
         Origen.Xap = new Uri("http://servicios.ejemplo.edu.ar/App/ClientBin/Principal.xap");
         try
@@ -40,6 +43,7 @@ public class PaquetesTests
             wc.OpenReadCompleted += (_, e) => listo.SetResult(e);
             wc.OpenReadAsync(new Uri("Modulos/Inscripciones.xap", UriKind.Relative));
             Assert.True(wc.IsBusy);
+            responder.SetResult();
 
             var e = await listo.Task.WaitAsync(TimeSpan.FromSeconds(10));
             Assert.Null(e.Error);
