@@ -145,7 +145,7 @@ void AbrirPortal(Uri inicio)
                 else if (orden == "codigo" && repositorio is not null)
                     Process.Start(new ProcessStartInfo(repositorio.AbsoluteUri) { UseShellExecute = true });
                 else if (orden.StartsWith("uksv:", StringComparison.Ordinal))
-                    Lanzar(orden, "script del portal");
+                    Lanzar(orden["uksv:".Length..], "script del portal"); // la orden es "uksv:" + el enlace (que empieza con uksv:)
                 else if (orden.StartsWith("cuenta:", StringComparison.Ordinal))
                     AtenderCuenta(orden["cuenta:".Length..]);
             }
@@ -159,9 +159,16 @@ void AbrirPortal(Uri inicio)
     // cookies del portal, que el lanzador manda como lo haría el navegador.
     void Lanzar(string url, string via)
     {
+        if (lanzador.Direccion(url) is not { } destino)
+        {
+            Console.WriteLine($"enlace de app recibido por {via}: no válido o fuera de los dominios permitidos");
+            return;
+        }
+        // Por la dirección ya interpretada: el mismo enlace puede llegar por los dos caminos, y el
+        // lanzador del portal es de un solo uso.
         bool nuevo;
-        lock (lanzados) nuevo = lanzados.Add(url);
-        if (!nuevo || lanzador.Direccion(url) is not { } destino) return;
+        lock (lanzados) nuevo = lanzados.Add(destino.AbsoluteUri);
+        if (!nuevo) return;
         Console.WriteLine("enlace de app recibido por " + via);
         var cookies = CookiesDelNavegador.ParaAsync(destino);
         _ = Task.Run(async () =>
