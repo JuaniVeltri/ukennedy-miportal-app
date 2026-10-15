@@ -81,3 +81,28 @@ Una etiqueta `vX.Y.Z` en `main` arma el paquete de Linux y publica la versión e
 ```sh
 git tag v0.2.0 && git push origin v0.2.0
 ```
+
+### Firma y notarización para macOS (mantenedores)
+
+Con una cuenta de Apple Developer, el CI firma el `.dmg` con un certificado **Developer ID
+Application** y lo notariza con Apple: así macOS lo abre sin alertas. Sin estos secretos, el
+paquete se firma ad hoc. Se cargan en **Settings → Secrets and variables → Actions** (nunca en
+el código, issues ni chats):
+
+| Secreto | Qué es |
+|---|---|
+| `MACOS_CERTIFICADO_P12` | El certificado Developer ID Application con su clave privada, exportado como `.p12` y pasado a base64 |
+| `MACOS_CERTIFICADO_CLAVE` | La contraseña con la que se exportó el `.p12` |
+| `MACOS_NOTARIZACION_P8` | El contenido de la clave de la API de App Store Connect (`AuthKey_XXXXXXXXXX.p8`) |
+| `MACOS_NOTARIZACION_KEY_ID` | El Key ID de esa clave |
+| `MACOS_NOTARIZACION_ISSUER_ID` | El Issuer ID de App Store Connect |
+
+Desde una Mac con [GitHub CLI](https://cli.github.com):
+
+```sh
+base64 -i certificado.p12 | gh secret set MACOS_CERTIFICADO_P12
+gh secret set MACOS_CERTIFICADO_CLAVE            # pide la contraseña
+gh secret set MACOS_NOTARIZACION_P8 < AuthKey_XXXXXXXXXX.p8
+gh secret set MACOS_NOTARIZACION_KEY_ID --body XXXXXXXXXX
+gh secret set MACOS_NOTARIZACION_ISSUER_ID --body xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
