@@ -1,8 +1,8 @@
-# Plan para macOS
+# macOS
 
-El motor (OpenSilver en WebAssembly) y el host (Photino) ya funcionan en macOS: Photino usa ahí
-WKWebView, el navegador del sistema. Lo que falta es lo que hoy se resuelve llamando directo a
-WebKitGTK, que solo existe en Linux (`src/Plata.Host/WebKitGtk.cs` y `CookiesDelNavegador.cs`).
+El motor (OpenSilver en WebAssembly) y el host (Photino) funcionan igual en macOS: Photino usa ahí
+WKWebView, el navegador del sistema. Lo que en Linux se resuelve llamando directo a WebKitGTK
+(`src/Plata.Host/WebKitGtk.cs` y `CookiesDelNavegador.cs`), en Mac se resuelve con WKWebView.
 
 | En Linux (WebKitGTK) | En macOS (WKWebView) | Estado |
 |---|---|---|
@@ -37,12 +37,14 @@ el Llavero.
 ## Paquete
 
 - `empaquetado/macos/empaquetar.sh` arma el `.app` (el host autocontenido para `osx-arm64`, el
-  motor, `argumentos.txt`, `Info.plist` e ícono), lo firma ad hoc y lo mete en un `.dmg`. El CI
-  lo arma en cada cambio (sección *Artifacts*) y en cada versión.
-- Firmar y notarizar con una cuenta de Apple Developer (USD 99 por año). Sin eso, macOS pide
-  "clic derecho → Abrir" la primera vez.
+  motor, `argumentos.txt`, `Info.plist` e ícono) y lo mete en un `.dmg`. El CI lo arma en cada
+  cambio (sección *Artifacts*) y en cada versión.
+- Con los secretos del repositorio (ver [CONTRIBUTING.md](../CONTRIBUTING.md)), el CI lo firma con
+  Developer ID (hardened runtime) y lo notariza con Apple: macOS lo abre sin alertas. Sin ellos,
+  por ejemplo en un fork, lo firma ad hoc y macOS pide confirmar la primera apertura.
+- Solo Apple Silicon por ahora. El script acepta `x64`, pero el CI no arma ese paquete.
 
 ## Cómo ayudar
 
-Hace falta alguien con una Mac para probar cada paso. Si podés, abrí un issue con la etiqueta
-**macos**.
+Si tenés una Mac, probá la app y contá cómo te fue en un issue con la etiqueta **macos**. Hace
+falta sobre todo alguien con una Mac con Intel.

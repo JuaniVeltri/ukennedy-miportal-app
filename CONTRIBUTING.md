@@ -76,7 +76,8 @@ OpenSilver y cómo se resolvió. Es la memoria del proyecto.
 
 ## Versiones (mantenedores)
 
-Una etiqueta `vX.Y.Z` en `main` arma el paquete de Linux y publica la versión en GitHub:
+Una etiqueta `vX.Y.Z` en `main` corre las pruebas, arma el paquete de Linux y el `.dmg` de macOS
+(firmado y notarizado si están los secretos de abajo) y publica la versión en GitHub:
 
 ```sh
 git tag v0.2.0 && git push origin v0.2.0
