@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: MIT
-# Arma el .dmg para macOS (corre en una Mac: usa sips, iconutil, codesign y hdiutil).
+# Arma el .dmg para macOS (corre en una Mac: usa sips, iconutil, tiffutil, codesign y dmgbuild).
 # Uso: empaquetado/macos/empaquetar.sh [versión] [arm64|x64]
 #   → dist/ukennedy-miportal-app-<versión>-macos-<arq>.dmg
 # Firma: con MACOS_IDENTIDAD (un certificado "Developer ID Application" en el llavero) firma con
@@ -55,8 +55,15 @@ else
   codesign --force --deep --sign - "$APP"
 fi
 
-ln -s /Applications "$TRABAJO/disco/Aplicaciones"
-hdiutil create -volname "$NOMBRE" -srcfolder "$TRABAJO/disco" -ov -format UDZO "$DMG"
+# La ventana del .dmg: fondo con el título y la flecha, la app a la izquierda y Aplicaciones a la
+# derecha (dmg.py). El fondo va en un .tiff con las versiones normal y Retina.
+python3 -m venv "$TRABAJO/venv"
+"$TRABAJO/venv/bin/pip" install --quiet "dmgbuild>=1.6,<2"
+tiffutil -cathidpicheck "$RAIZ/empaquetado/macos/fondo-dmg.png" "$RAIZ/empaquetado/macos/fondo-dmg@2x.png" \
+  -out "$TRABAJO/fondo.tiff"
+rm -f "$DMG"
+"$TRABAJO/venv/bin/dmgbuild" -s "$RAIZ/empaquetado/macos/dmg.py" -D app="$APP" -D fondo="$TRABAJO/fondo.tiff" \
+  -D icono="$APP/Contents/Resources/icono.icns" "$NOMBRE" "$DMG"
 
 if [ -n "${MACOS_IDENTIDAD:-}" ]; then
   codesign --force --timestamp --sign "$MACOS_IDENTIDAD" "$DMG"
