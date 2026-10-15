@@ -15,8 +15,9 @@ dotnet publish "$RAIZ/src/Plata.Host" -c Release -r linux-x64 --self-contained -
 dotnet publish "$RAIZ/src/Plata.MotorWasm" -c Release -o "$TEMP"
 cp -r "$TEMP/wwwroot" "$SALIDA/app/motor"
 rm -rf "$TEMP"
+cp "$RAIZ/empaquetado/argumentos.txt" "$RAIZ/empaquetado/icono.png" "$SALIDA/app/"
 
-cp "$RAIZ/empaquetado/ukennedy-miportal-app" "$RAIZ/empaquetado/icono.svg" \
+cp "$RAIZ/empaquetado/ukennedy-miportal-app" "$RAIZ/empaquetado/icono.svg" "$RAIZ/empaquetado/icono.png" \
    "$RAIZ/empaquetado/linux/ukennedy-miportal-app.desktop" \
    "$RAIZ/empaquetado/linux/instalar.sh" "$RAIZ/empaquetado/linux/desinstalar.sh" \
    "$RAIZ/LICENSE" "$SALIDA/"

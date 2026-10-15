@@ -1,0 +1,76 @@
+#!/bin/sh
+# SPDX-License-Identifier: MIT
+# Arma el .dmg para macOS (corre en una Mac: usa sips, iconutil, tiffutil, codesign y dmgbuild).
+# Uso: empaquetado/macos/empaquetar.sh [versión] [arm64|x64]
+#   → dist/ukennedy-miportal-app-<versión>-macos-<arq>.dmg
+# Firma: con MACOS_IDENTIDAD (un certificado "Developer ID Application" en el llavero) firma con
+# hardened runtime; si además están MACOS_NOTARIZACION_CLAVE (archivo .p8), _KEY_ID y _ISSUER_ID,
+# notariza el .dmg con Apple y le agrega el ticket. Sin MACOS_IDENTIDAD, firma ad hoc.
+set -eu
+RAIZ=$(cd "$(dirname "$0")/../.." && pwd)
+VERSION=${1:-0.1.0}
+ARQ=${2:-arm64}
+NOMBRE="Universidad Kennedy MiPortal App"
+TRABAJO=$RAIZ/dist/macos-$ARQ
+APP=$TRABAJO/disco/$NOMBRE.app
+
+rm -rf "$TRABAJO"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+
+# El ejecutable y todo lo que necesita (.NET incluido) van en Contents/MacOS. El motor (miles de
+# archivos que no son código nativo) va en Contents/Resources: así no se firma archivo por archivo.
+dotnet publish "$RAIZ/src/Plata.Host" -c Release -r "osx-$ARQ" --self-contained -o "$APP/Contents/MacOS"
+dotnet publish "$RAIZ/src/Plata.MotorWasm" -c Release -o "$TRABAJO/motor"
+cp -R "$TRABAJO/motor/wwwroot" "$APP/Contents/Resources/motor"
+cp "$RAIZ/empaquetado/icono.png" "$APP/Contents/MacOS/"
+{ cat "$RAIZ/empaquetado/argumentos.txt"
+  printf -- '--motor\n../Resources/motor\n--registro\n~/Library/Logs/UKennedyMiPortalApp/registro.txt\n'; } \
+  > "$APP/Contents/MacOS/argumentos.txt"
+
+ICONOS=$TRABAJO/icono.iconset
+mkdir -p "$ICONOS"
+for t in 16 32 128 256 512; do
+  sips -z "$t" "$t" "$RAIZ/empaquetado/icono.png" --out "$ICONOS/icon_${t}x${t}.png" >/dev/null
+  sips -z $((t * 2)) $((t * 2)) "$RAIZ/empaquetado/icono.png" --out "$ICONOS/icon_${t}x${t}@2x.png" >/dev/null
+done
+iconutil -c icns "$ICONOS" -o "$APP/Contents/Resources/icono.icns"
+sed "s/__VERSION__/$VERSION/g" "$RAIZ/empaquetado/macos/Info.plist" > "$APP/Contents/Info.plist"
+cp "$RAIZ/LICENSE" "$APP/Contents/Resources/"
+
+DMG=$RAIZ/dist/ukennedy-miportal-app-$VERSION-macos-$ARQ.dmg
+if [ -n "${MACOS_IDENTIDAD:-}" ]; then
+  # De adentro hacia afuera. En Contents/MacOS todo archivo cuenta como código y tiene que estar
+  # firmado (también las .dll de .NET); el ejecutable principal va al final, y después el .app.
+  firmar() {
+    codesign --force --timestamp --options runtime --entitlements "$RAIZ/empaquetado/macos/permisos.plist" \
+      --sign "$MACOS_IDENTIDAD" "$1"
+  }
+  find "$APP/Contents/MacOS" -type f ! -name Plata.Host | while read -r f; do firmar "$f"; done
+  firmar "$APP/Contents/MacOS/Plata.Host"
+  firmar "$APP"
+  codesign --verify --deep --strict --verbose=1 "$APP"
+else
+  # Firma ad hoc: sin cuenta de Apple Developer no hay firma ni notarización, pero las Mac con
+  # Apple Silicon no corren código sin firmar. La primera vez, macOS pide confirmar la apertura.
+  codesign --force --deep --sign - "$APP"
+fi
+
+# La ventana del .dmg: fondo con el título y la flecha, la app a la izquierda y Aplicaciones a la
+# derecha (dmg.py). El fondo va en un .tiff con las versiones normal y Retina.
+python3 -m venv "$TRABAJO/venv"
+"$TRABAJO/venv/bin/pip" install --quiet "dmgbuild>=1.6,<2"
+tiffutil -cathidpicheck "$RAIZ/empaquetado/macos/fondo-dmg.png" "$RAIZ/empaquetado/macos/fondo-dmg@2x.png" \
+  -out "$TRABAJO/fondo.tiff"
+rm -f "$DMG"
+"$TRABAJO/venv/bin/dmgbuild" -s "$RAIZ/empaquetado/macos/dmg.py" -D app="$APP" -D fondo="$TRABAJO/fondo.tiff" \
+  -D icono="$APP/Contents/Resources/icono.icns" "$NOMBRE" "$DMG"
+
+if [ -n "${MACOS_IDENTIDAD:-}" ]; then
+  codesign --force --timestamp --sign "$MACOS_IDENTIDAD" "$DMG"
+  if [ -n "${MACOS_NOTARIZACION_CLAVE:-}" ]; then
+    xcrun notarytool submit "$DMG" --key "$MACOS_NOTARIZACION_CLAVE" \
+      --key-id "$MACOS_NOTARIZACION_KEY_ID" --issuer "$MACOS_NOTARIZACION_ISSUER_ID" --wait
+    xcrun stapler staple "$DMG"
+  fi
+fi
+echo "listo: $DMG"

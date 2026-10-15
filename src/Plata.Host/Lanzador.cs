@@ -20,16 +20,94 @@ public sealed class Lanzador
     /// botón "Si ya instalaste el visor hacé clic aquí"). En Plata el visor está, pero el portal
     /// corre en un marco y el navegador no le deja leer ni escribir cookies desde JavaScript: se
     /// responde directo. Además avisa a la ventana apenas se hace clic en una app (el enlace llega
-    /// recién después de la respuesta del servidor).
+    /// recién después de la respuesta del servidor) y le pasa el enlace <c>uksv:</c> en cuanto el
+    /// portal lo pone en su iframe: así no depende de que el navegador cargue un esquema propio
+    /// dentro de una página https (en macOS lo bloquea). En el formulario de inicio de sesión agrega
+    /// "Recordarme en este equipo" y, si hay una cuenta recordada, "Iniciar sesión como …" (la cuenta
+    /// la guarda el host en el llavero del sistema, ver <see cref="Credenciales"/>). Solo corre en
+    /// páginas web: no en la ventana ni en las pestañas de las apps.
     /// </summary>
     public const string ScriptDelPortal = """
         (function () {
+          if (!/^https?:$/.test(location.protocol)) return;
           if (typeof checkUKSVCookie === 'function') window.checkUKSVCookie = function () { return true; };
           if (window.parent === window) return;
           document.addEventListener('click', function (e) {
             var a = e.target && e.target.closest && e.target.closest('a[onclick*="checkConditions"]');
             if (a) window.parent.postMessage({ plataPortal: 'abriendo' }, '*');
           }, true);
+          function revisar(nodo) {
+            if (!nodo || nodo.nodeType !== 1) return;
+            var marcos = nodo.tagName === 'IFRAME' ? [nodo] : nodo.querySelectorAll('iframe');
+            for (var i = 0; i < marcos.length; i++) {
+              var src = marcos[i].getAttribute('src') || '';
+              if (/^uksv:/i.test(src)) window.parent.postMessage({ plataUksv: src }, '*');
+            }
+          }
+          new MutationObserver(function (cambios) {
+            cambios.forEach(function (c) {
+              if (c.type === 'attributes') revisar(c.target);
+              else for (var i = 0; i < c.addedNodes.length; i++) revisar(c.addedNodes[i]);
+            });
+          }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] });
+
+          var usuario = document.getElementById('ctl00_login_txtUser');
+          var clave = document.getElementById('ctl00_login_txtPasswd');
+          var entrar = document.getElementById('ctl00_login_btnEnviar');
+          if (!usuario || !clave || !entrar) return;
+          window.addEventListener('message', function (e) {
+            if (e.source !== window.parent || !e.data || !e.data.plataCuenta) return;
+            var c = e.data.plataCuenta;
+            if (c.tipo === 'cuenta' && c.disponible) recordarme(c.usuario || null);
+            if (c.tipo === 'cuenta-clave' && c.usuario && c.clave) {
+              usuario.value = c.usuario;
+              clave.value = c.clave;
+              entrar.click();
+            }
+          });
+          window.parent.postMessage({ plataCuenta: 'consultar' }, '*');
+
+          function recordarme(guardado) {
+            var tabla = entrar.closest('table');
+            var celda = tabla.insertRow(-1).insertCell(0);
+            // Estilos propios con !important: los del portal (pensados para sus campos) no los pisan.
+            celda.innerHTML = '<label style="display:flex!important;align-items:center!important;justify-content:flex-start!important;' +
+              'gap:8px!important;width:auto!important;margin:12px 0 0!important;padding:0!important;font-size:13px!important;' +
+              'font-weight:normal!important;line-height:1.2!important;color:#3a3f45!important;cursor:pointer!important">' +
+              '<input type="checkbox" style="-webkit-appearance:checkbox!important;appearance:auto!important;width:15px!important;' +
+              'height:15px!important;min-width:0!important;max-width:15px!important;margin:0!important;padding:0!important;' +
+              'flex:none!important;border:0!important;box-shadow:none!important;accent-color:#ae0f0a!important">' +
+              '<span>Recordarme en este equipo</span></label>';
+            var tilde = celda.querySelector('input');
+            tilde.checked = !!guardado;
+            entrar.form.addEventListener('submit', function () {
+              if (tilde.checked && usuario.value && clave.value)
+                window.parent.postMessage({ plataCuenta: { guardar: { usuario: usuario.value, clave: clave.value } } }, '*');
+              else if (!tilde.checked && guardado)
+                window.parent.postMessage({ plataCuenta: 'olvidar' }, '*');
+            });
+            if (!guardado) return;
+            var fila = tabla.insertRow(0), arriba = fila.insertCell(0);
+            var boton = document.createElement('input');
+            boton.type = 'button';
+            boton.className = entrar.className;
+            boton.value = 'Iniciar sesión como ' + guardado;
+            boton.style.cssText = 'margin:0!important';
+            boton.addEventListener('click', function () { window.parent.postMessage({ plataCuenta: 'clave' }, '*'); });
+            var otra = document.createElement('a');
+            otra.href = '#';
+            otra.textContent = 'Usar otra cuenta';
+            otra.style.cssText = 'display:block!important;margin:8px 0 18px!important;font-size:12.5px!important;' +
+              'text-align:center!important;color:#5f6770!important;text-decoration:underline!important';
+            otra.addEventListener('click', function (e) {
+              e.preventDefault();
+              fila.remove();
+              tilde.checked = false;
+              usuario.focus();
+            });
+            arriba.appendChild(boton);
+            arriba.appendChild(otra);
+          }
         })();
         """;
 

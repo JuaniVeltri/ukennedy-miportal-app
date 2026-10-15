@@ -5,7 +5,7 @@ namespace Plata.Host;
 
 /// <summary>
 /// Ajustes del navegador de la ventana que Photino no ofrece (Linux, WebKitGTK). Se llaman desde el
-/// hilo de la ventana, una vez creada. En otros sistemas no hacen nada.
+/// hilo de la ventana, una vez creada (ver <see cref="Navegador"/>). En otros sistemas no hacen nada.
 /// </summary>
 internal static class WebKitGtk
 {

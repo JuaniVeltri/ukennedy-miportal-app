@@ -4,8 +4,8 @@
 [![Licencia: MIT](https://img.shields.io/badge/licencia-MIT-blue.svg)](LICENSE)
 [![Última versión](https://img.shields.io/github/v/release/JuaniVeltri/ukennedy-miportal-app?label=versi%C3%B3n)](https://github.com/JuaniVeltri/ukennedy-miportal-app/releases)
 
-Usá **UK Académico** y **UK Cuentas Corrientes** de MiPortal en **Linux** (y pronto en macOS),
-sin Windows, sin Internet Explorer y sin el plugin de Silverlight.
+Usá **UK Académico** y **UK Cuentas Corrientes** de MiPortal en **Linux** y **macOS**, sin
+Windows, sin Internet Explorer y sin el plugin de Silverlight.
 
 > **Proyecto independiente y no oficial.** No lo hace ni lo mantiene la Universidad Kennedy ni
 > GGI; se desarrolla con su autorización y como código abierto. "Universidad Kennedy" y
@@ -46,13 +46,21 @@ Esta app es una ventana con pestañas:
 
 4. Abrila desde el menú de aplicaciones: **Universidad Kennedy MiPortal App**.
 
-Para quitarla: `~/.local/share/ukennedy-miportal-app/desinstalar.sh`.
+Para quitarla: `~/.local/share/ukennedy-miportal-app/desinstalar.sh`. Si algo falla, el registro
+está en `~/.local/state/ukennedy-miportal-app/registro.txt`.
 
-### macOS
+### macOS (Apple Silicon)
 
-En camino. El motor funciona igual, pero la integración con el portal usa funciones del navegador
-de Linux que en Mac se resuelven de otra forma. El plan está en [docs/macos.md](docs/macos.md).
-Si tenés una Mac y querés ayudar a probar, [contanos](https://github.com/JuaniVeltri/ukennedy-miportal-app/issues).
+1. Bajá el `.dmg` de la [última versión](https://github.com/JuaniVeltri/ukennedy-miportal-app/releases).
+2. Abrilo y arrastrá **Universidad Kennedy MiPortal App** a **Aplicaciones**.
+3. Abrila desde Aplicaciones o Launchpad.
+
+La app está firmada con Developer ID y notarizada por Apple: abre sin alertas ni pasos extra.
+Por ahora hay paquete solo para Mac con Apple Silicon (M1 en adelante).
+
+Si algo falla, el registro está en `~/Library/Logs/UKennedyMiPortalApp/registro.txt` (no tiene
+contraseñas ni datos de la sesión): adjuntalo en un [reporte](https://github.com/JuaniVeltri/ukennedy-miportal-app/issues/new/choose).
+Qué cambia en Mac respecto de Linux: [docs/macos.md](docs/macos.md).
 
 ### Windows
 
@@ -80,7 +88,9 @@ Usá el visor oficial de la universidad.
 
 - **Todo corre en tu computadora.** No hay servidores intermedios: la app habla directo con la
   universidad.
-- **No guarda tu contraseña.** Iniciás sesión en el portal, como en cualquier navegador.
+- **No guarda tu contraseña,** salvo que lo pidas: en Linux, "Recordarme en este equipo" la guarda
+  en el llavero del sistema (GNOME Keyring, KWallet), nunca en un archivo. En macOS esa opción no
+  existe. Iniciás sesión en el portal, como en cualquier navegador.
 - **La sesión vive en memoria** y se borra al cerrar la app.
 - La app solo se conecta a los dominios de la universidad y a los que sus propias políticas
   permiten. Los documentos que abrís (comprobantes) quedan en una carpeta temporal tuya.
@@ -103,14 +113,14 @@ compatibilidad o la documentación. Leé la [guía para colaborar](CONTRIBUTING.
 | `src/Plata.Motor` | Lee el `.xap` y adapta sus ensamblados de Silverlight a .NET moderno y OpenSilver. |
 | `src/Plata.Compat` | Lo que Silverlight tenía y OpenSilver no (o hace distinto): XAML, WCF, AES, WebClient, etc. |
 | `tests/` | Pruebas (xUnit). No usan datos reales. |
-| `empaquetado/` | Instalador para Linux y lanzador de la app. |
+| `empaquetado/` | Paquetes para Linux (`.tar.gz` con instalador) y macOS (`.dmg`), y los argumentos de la app. |
 | `extension/` | Extensión de navegador experimental que detecta apps Silverlight en cualquier página. |
 | `docs/` | Autorización, compatibilidad con las apps de la Kennedy, diseño y planes. |
 
 ### Desarrollo
 
 Requisitos: [.NET 10 SDK](https://dotnet.microsoft.com/download), la carga de trabajo de WebAssembly
-y WebKitGTK 4.1.
+y, en Linux, WebKitGTK 4.1 (en macOS la app usa el WKWebView del sistema).
 
 ```sh
 dotnet workload install wasm-tools
@@ -123,11 +133,14 @@ dotnet run --project src/Plata.Host -- --motor /tmp/motor/wwwroot \
   --nombre "Universidad Kennedy MiPortal App (no oficial)" \
   --portal https://miportal.kennedy.edu.ar/ --portal-nombre MiPortal --permitir kennedy.edu.ar
 
-# Armar el paquete de Linux (queda en dist/)
+# Armar los paquetes (quedan en dist/)
 empaquetado/linux/empaquetar.sh 0.1.0
+empaquetado/macos/empaquetar.sh 0.1.0   # en una Mac; firma ad hoc sin MACOS_IDENTIDAD
 ```
 
 ## Licencia
 
 [MIT](LICENSE). Las aplicaciones de la universidad (los `.xap`) no forman parte de este
-repositorio: la app las baja del servidor de la universidad cada vez que las abrís.
+repositorio: la app las baja del servidor de la universidad cada vez que las abrís. El isotipo de
+la Universidad Kennedy que usa el ícono (`empaquetado/icono.*`) es marca de la universidad y no
+está cubierto por la licencia MIT.

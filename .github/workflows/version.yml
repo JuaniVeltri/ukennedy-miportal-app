@@ -28,3 +28,53 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" dist/*.tar.gz \
             --title "$GITHUB_REF_NAME" --generate-notes
+
+  macos:
+    name: Paquete de macOS (Apple Silicon)
+    needs: linux
+    runs-on: macos-latest
+    env:
+      # Firma y notarización de Apple: solo si el repositorio tiene los secretos (ver CONTRIBUTING.md).
+      TIENE_CERTIFICADO: ${{ secrets.MACOS_CERTIFICADO_P12 != '' }}
+      MACOS_NOTARIZACION_KEY_ID: ${{ secrets.MACOS_NOTARIZACION_KEY_ID }}
+      MACOS_NOTARIZACION_ISSUER_ID: ${{ secrets.MACOS_NOTARIZACION_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Carga de trabajo de WebAssembly
+        run: dotnet workload install wasm-tools
+      - name: Certificado de Apple (si el repositorio lo tiene)
+        if: env.TIENE_CERTIFICADO == 'true'
+        env:
+          CERTIFICADO: ${{ secrets.MACOS_CERTIFICADO_P12 }}
+          CLAVE: ${{ secrets.MACOS_CERTIFICADO_CLAVE }}
+          P8: ${{ secrets.MACOS_NOTARIZACION_P8 }}
+        run: |
+          LLAVERO="$RUNNER_TEMP/firma.keychain-db"
+          security create-keychain -p temporal "$LLAVERO"
+          security set-keychain-settings -lut 21600 "$LLAVERO"
+          security unlock-keychain -p temporal "$LLAVERO"
+          printf '%s' "$CERTIFICADO" | base64 --decode > "$RUNNER_TEMP/certificado.p12"
+          security import "$RUNNER_TEMP/certificado.p12" -k "$LLAVERO" -P "$CLAVE" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificado.p12"
+          security set-key-partition-list -S apple-tool:,apple: -k temporal "$LLAVERO" >/dev/null
+          security list-keychains -d user -s "$LLAVERO" $(security list-keychains -d user | tr -d '"')
+          IDENTIDAD=$(security find-identity -v -p codesigning "$LLAVERO" | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)"/\1/')
+          echo "MACOS_IDENTIDAD=$IDENTIDAD" >> "$GITHUB_ENV"
+          if [ -n "$P8" ]; then
+            printf '%s' "$P8" > "$RUNNER_TEMP/notarizacion.p8"
+            echo "MACOS_NOTARIZACION_CLAVE=$RUNNER_TEMP/notarizacion.p8" >> "$GITHUB_ENV"
+          fi
+      - name: Armar el .dmg
+        run: empaquetado/macos/empaquetar.sh "${GITHUB_REF_NAME#v}" arm64
+      - name: Sumarlo a la versión
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/*.dmg
+      - name: Borrar el llavero temporal
+        if: always() && env.TIENE_CERTIFICADO == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/firma.keychain-db" || true
+          rm -f "$RUNNER_TEMP/notarizacion.p8"
