@@ -14,7 +14,7 @@ if (Path.Combine(AppContext.BaseDirectory, "argumentos.txt") is var archivoDeArg
 // Registro en un archivo (además de la consola): sin consola, es lo único que queda para ver qué pasó.
 if (ArgOf(args, "--registro") is { } registro) Registro.Iniciar(registro);
 
-var motor = new ServidorDeArchivos(ArgOf(args, "--motor") ?? Path.Combine(AppContext.BaseDirectory, "motor"));
+var motor = new ServidorDeArchivos(ArgOf(args, "--motor") is { } m ? Ruta(m) : Path.Combine(AppContext.BaseDirectory, "motor"));
 // Red de las apps: solo los dominios permitidos (separados por coma), p. ej. "kennedy.edu.ar".
 var portero = new Portero((ArgOf(args, "--permitir") ?? "").Split(','));
 // Lo que las apps abren en otra ventana (reportes): lo baja el Portero y lo abre el sistema.
@@ -26,7 +26,7 @@ var diagnostico = args.Contains("--diagnostico");
 // Las apps empaquetadas los fijan en su lanzador; sin ellos, es Plata.
 var nombre = ArgOf(args, "--nombre") ?? "Plata";
 // Ícono de la ventana (relativo al ejecutable si no es una ruta completa).
-var icono = ArgOf(args, "--icono") is { } ic && Path.Combine(AppContext.BaseDirectory, ic) is var ri && File.Exists(ri) ? ri : null;
+var icono = ArgOf(args, "--icono") is { } ic && Ruta(ic) is var ri && File.Exists(ri) ? ri : null;
 var repositorio = ArgOf(args, "--repo") is { } r && Uri.TryCreate(r, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps ? u : null;
 // La red de las apps sigue las reglas de Silverlight (clientaccesspolicy.xml).
 var politica = new PoliticaDeAcceso(portero.TraerPoliticaAsync);
@@ -195,6 +195,11 @@ static string Recurso(string nombre)
         ?? throw new InvalidOperationException("falta el recurso " + nombre);
     return new StreamReader(s).ReadToEnd();
 }
+
+// Una ruta relativa de los argumentos: desde el directorio actual si existe ahí; si no, desde el
+// ejecutable (las de argumentos.txt, p. ej. "../Resources/motor" dentro del .app de macOS).
+static string Ruta(string r)
+    => Path.IsPathRooted(r) || File.Exists(r) || Directory.Exists(r) ? r : Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, r));
 
 static string? ArgOf(string[] a, string n)
 {

@@ -17,12 +17,14 @@ APP=$TRABAJO/disco/$NOMBRE.app
 rm -rf "$TRABAJO"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-# El ejecutable y todo lo que necesita (.NET incluido) van en Contents/MacOS, con el motor al lado.
+# El ejecutable y todo lo que necesita (.NET incluido) van en Contents/MacOS. El motor (miles de
+# archivos que no son código nativo) va en Contents/Resources: así no se firma archivo por archivo.
 dotnet publish "$RAIZ/src/Plata.Host" -c Release -r "osx-$ARQ" --self-contained -o "$APP/Contents/MacOS"
 dotnet publish "$RAIZ/src/Plata.MotorWasm" -c Release -o "$TRABAJO/motor"
-cp -R "$TRABAJO/motor/wwwroot" "$APP/Contents/MacOS/motor"
+cp -R "$TRABAJO/motor/wwwroot" "$APP/Contents/Resources/motor"
 cp "$RAIZ/empaquetado/icono.png" "$APP/Contents/MacOS/"
-{ cat "$RAIZ/empaquetado/argumentos.txt"; printf -- '--registro\n~/Library/Logs/UKennedyMiPortalApp/registro.txt\n'; } \
+{ cat "$RAIZ/empaquetado/argumentos.txt"
+  printf -- '--motor\n../Resources/motor\n--registro\n~/Library/Logs/UKennedyMiPortalApp/registro.txt\n'; } \
   > "$APP/Contents/MacOS/argumentos.txt"
 
 ICONOS=$TRABAJO/icono.iconset
@@ -37,16 +39,16 @@ cp "$RAIZ/LICENSE" "$APP/Contents/Resources/"
 
 DMG=$RAIZ/dist/ukennedy-miportal-app-$VERSION-macos-$ARQ.dmg
 if [ -n "${MACOS_IDENTIDAD:-}" ]; then
-  # De adentro hacia afuera: cada binario (ejecutables y bibliotecas) y después el .app.
-  find "$APP/Contents/MacOS" -type f | while read -r f; do
-    if file -b "$f" | grep -q "Mach-O"; then
-      codesign --force --timestamp --options runtime --entitlements "$RAIZ/empaquetado/macos/permisos.plist" \
-        --sign "$MACOS_IDENTIDAD" "$f"
-    fi
-  done
-  codesign --force --timestamp --options runtime --entitlements "$RAIZ/empaquetado/macos/permisos.plist" \
-    --sign "$MACOS_IDENTIDAD" "$APP"
-  codesign --verify --deep --strict "$APP"
+  # De adentro hacia afuera. En Contents/MacOS todo archivo cuenta como código y tiene que estar
+  # firmado (también las .dll de .NET); el ejecutable principal va al final, y después el .app.
+  firmar() {
+    codesign --force --timestamp --options runtime --entitlements "$RAIZ/empaquetado/macos/permisos.plist" \
+      --sign "$MACOS_IDENTIDAD" "$1"
+  }
+  find "$APP/Contents/MacOS" -type f ! -name Plata.Host | while read -r f; do firmar "$f"; done
+  firmar "$APP/Contents/MacOS/Plata.Host"
+  firmar "$APP"
+  codesign --verify --deep --strict --verbose=1 "$APP"
 else
   # Firma ad hoc: sin cuenta de Apple Developer no hay firma ni notarización, pero las Mac con
   # Apple Silicon no corren código sin firmar. La primera vez, macOS pide confirmar la apertura.
