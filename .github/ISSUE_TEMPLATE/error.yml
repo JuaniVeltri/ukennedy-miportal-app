@@ -1,0 +1,57 @@
+name: Algo falla o se ve distinto
+description: Un error, una pantalla que no abre o algo que se ve distinto que en Windows.
+labels: ["error"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportarlo. **Antes de seguir:** tapá tu nombre, legajo, materias, montos y
+        cualquier dato personal de las capturas. Nunca pegues contraseñas, cookies ni enlaces `uksv:`.
+  - type: dropdown
+    id: app
+    attributes:
+      label: ¿Dónde pasa?
+      options: [MiPortal (inicio de sesión, pestañas), UK Académico, UK Cuentas Corrientes, Instalación, Otro]
+    validations:
+      required: true
+  - type: textarea
+    id: que-paso
+    attributes:
+      label: Qué pasó
+      description: Qué esperabas y qué pasó en cambio. Si hubo un mensaje de error, copialo.
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. Abrí UK Académico
+        2. Fui a Herramientas → …
+        3. …
+    validations:
+      required: true
+  - type: textarea
+    id: capturas
+    attributes:
+      label: Capturas
+      description: Si podés, una de la app y otra de cómo se veía en Windows (con los datos tapados).
+  - type: input
+    id: sistema
+    attributes:
+      label: Sistema operativo
+      placeholder: Fedora 44, Ubuntu 24.04, macOS 15…
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión de la app
+      placeholder: 0.1.0
+  - type: checkboxes
+    id: datos
+    attributes:
+      label: Datos personales
+      options:
+        - label: Revisé que el reporte y las capturas no tengan datos personales ni contraseñas.
+          required: true

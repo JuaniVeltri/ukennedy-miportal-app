@@ -371,8 +371,15 @@ Limitaciones conocidas:
   elemento de GGI con `Effect` + `RenderTransform` + origen no nulo; `CargadorDeXaml.OrigenConEfecto`
   aplica esa regla solo a esa combinación. Falta confirmarlo con otras apps.
 
+### Red de las apps: reglas de Silverlight
+
+Lo que pide una app en ejecución sigue las reglas de Silverlight (`PoliticaDeAcceso.cs`): su sitio
+de origen siempre; otro sitio, solo si su `/clientaccesspolicy.xml` lo permite (o un
+`/crossdomain.xml` abierto a todos). Los servidores de servicios de la universidad publican
+políticas abiertas a `http://*` (y `servicios1`, también a `https://*`). `--permitir` queda para
+lo que pide el host: portal, lanzador, `.xap` y documentos.
+
 ### Pendiente
 
 - `KeepAliveWebSession`: mantener viva la sesión ASP.NET de la página.
-- Política de dominios: hoy explícita por argumento; falta `clientaccesspolicy.xml`.
-- macOS.
+- macOS ([plan](../macos.md)).
