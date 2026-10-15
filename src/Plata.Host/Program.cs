@@ -98,7 +98,7 @@ void AbrirPortal(Uri inicio)
         .Center()
         .SetLogVerbosity(0)
         // El portal solo ofrece las apps a Windows (el visor oficial es de Windows). La universidad
-        // autorizó presentarse como Windows ante el portal (docs/autorizacion.md).
+        // autorizó presentarse como Windows ante el portal.
         .SetUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36")
         .RegisterCustomSchemeHandler("plata", (object _, string _, string url, out string ct) =>
         {

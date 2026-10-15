@@ -8,9 +8,8 @@ Usá **UK Académico** y **UK Cuentas Corrientes** de MiPortal en **Linux** (y p
 sin Windows, sin Internet Explorer y sin el plugin de Silverlight.
 
 > **Proyecto independiente y no oficial.** No lo hace ni lo mantiene la Universidad Kennedy ni
-> GGI. La universidad autorizó por escrito su desarrollo, con la condición de que sea de código
-> abierto ([docs/autorizacion.md](docs/autorizacion.md)). "Universidad Kennedy" y "MiPortal" se
-> nombran solo para indicar con qué sistemas funciona.
+> GGI; se desarrolla con su autorización y como código abierto. "Universidad Kennedy" y
+> "MiPortal" se nombran solo para indicar con qué sistemas funciona.
 
 ![Académico abierto en la app: menú de Inscripciones](docs/imagenes/academico-menu.png)
 

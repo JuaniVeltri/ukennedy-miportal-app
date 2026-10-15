@@ -1,7 +1,6 @@
 # Análisis de compatibilidad — apps de la Universidad Kennedy
 
-Análisis estático de los `.xap` de la universidad, bajo la autorización en
-[`../autorizacion.md`](../autorizacion.md). Los `.xap` **no** están en el
+Análisis estático de los `.xap` de la universidad, con su autorización. Los `.xap` **no** están en el
 repositorio; este documento solo registra su estructura y dependencias.
 
 ## Apps
@@ -236,11 +235,11 @@ Huecos cubiertos en el camino, todos generales (sirven a cualquier app Silverlig
 `IApplicationService` (WCF, `basicHttpBinding`). Sin servidor no llega respuesta y no
 se abre ninguna aplicación. Siguen: imágenes y recursos `/Ensamblado;component/…`,
 `ResourceDictionary Source` y `themes/generic.xaml`, y la red (Portero) con datos
-reales, ya autorizada (ver `../autorizacion.md`, correo 2).
+reales, con autorización de la universidad.
 
 ## Académico funcionando con la sesión real (2026-10-15)
 
-Con la autorización del correo 2 (`../autorizacion.md`): MiPortal abierto como Windows, el
+Con autorización de la universidad: MiPortal abierto como Windows, el
 `initParams` real de `Gestion.aspx` y la red por el host. **Resultado:** el shell de GGI, el
 menú de sistemas, el menú lateral de Inscripciones y la pantalla **Inscripción a Materias**
 se dibujan con los datos reales del alumno (materias, inscripción vigente, comisiones), igual
@@ -323,7 +322,7 @@ nueva. Las dos apps abren y cargan datos con la sesión real.
 
 Cómo funciona:
 
-- **User-Agent de Windows** solo en esta ventana (autorizado, `docs/autorizacion.md`): el portal
+- **User-Agent de Windows** solo en esta ventana (autorizado por la universidad): el portal
   solo ofrece las apps a Windows.
 - **El enlace `uksv:`.** El portal lo pone en un iframe oculto. Plata registra el esquema `uksv` en
   el navegador de la ventana. En WebKitGTK un esquema propio cuenta como inseguro y una página
