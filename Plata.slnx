@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Plata.Compat/Plata.Compat.csproj" />
     <Project Path="src/Plata.Host/Plata.Host.csproj" />
     <Project Path="src/Plata.Motor/Plata.Motor.csproj" />
     <Project Path="src/Plata.MotorApp/Plata.MotorApp.csproj" />
