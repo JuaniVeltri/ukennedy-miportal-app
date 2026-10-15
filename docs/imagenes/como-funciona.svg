@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 430" font-family="system-ui, -apple-system, Segoe UI, Ubuntu, sans-serif" font-size="14">
+  <!-- SPDX-License-Identifier: MIT -->
+  <defs>
+    <marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10z" fill="#5b636d"/>
+    </marker>
+    <style>
+      .caja { fill: #f4f6f8; stroke: #9aa3ad; stroke-width: 1.2; rx: 10; }
+      .app { fill: #e9eef5; stroke: #6d8bb0; }
+      .host { fill: #eef3ea; stroke: #7da06a; }
+      .ext { fill: #fff6e8; stroke: #c9a15b; }
+      .t { fill: #22272e; font-weight: 600; }
+      .s { fill: #4b535c; font-size: 12.5px; }
+      .l { stroke: #5b636d; stroke-width: 1.6; fill: none; marker-end: url(#f); }
+      .n { fill: #5b636d; font-size: 12px; }
+    </style>
+  </defs>
+
+  <rect x="10" y="10" width="940" height="290" rx="14" fill="#fafbfc" stroke="#c5ccd3"/>
+  <text x="28" y="36" class="t">Ventana de la app (una sola, con pestañas)</text>
+
+  <rect x="30" y="56" width="260" height="96" class="caja ext"/>
+  <text x="46" y="82" class="t">1. Pestaña MiPortal</text>
+  <text x="46" y="104" class="s">El alumno inicia sesión como siempre.</text>
+  <text x="46" y="122" class="s">Clic en "UK Académico" o "UK Cuentas</text>
+  <text x="46" y="140" class="s">Corrientes" → el portal da un enlace uksv:</text>
+
+  <rect x="350" y="56" width="260" height="96" class="caja host"/>
+  <text x="366" y="82" class="t">2. Lanzador (como el visor de Windows)</text>
+  <text x="366" y="104" class="s">Pide Launcher.aspx con la sesión del</text>
+  <text x="366" y="122" class="s">portal, sigue hasta la página de la app</text>
+  <text x="366" y="140" class="s">y saca el .xap y sus InitParams.</text>
+
+  <rect x="670" y="56" width="260" height="96" class="caja app"/>
+  <text x="686" y="82" class="t">3. Pestaña de la app</text>
+  <text x="686" y="104" class="s">El motor (OpenSilver en WebAssembly)</text>
+  <text x="686" y="122" class="s">adapta el .xap de Silverlight y lo corre,</text>
+  <text x="686" y="140" class="s">igual que el plugin original.</text>
+
+  <path d="M290 104H346" class="l"/>
+  <path d="M610 104H666" class="l"/>
+
+  <rect x="350" y="190" width="580" height="90" class="caja host"/>
+  <text x="366" y="216" class="t">Portero: la red de las apps</text>
+  <text x="366" y="238" class="s">Hace cada pedido HTTP de la app (servicios WCF, imágenes, reportes) con la sesión,</text>
+  <text x="366" y="256" class="s">bajo las reglas de Silverlight (clientaccesspolicy.xml). Cookies solo en memoria.</text>
+  <text x="366" y="274" class="s">Lo que la app abre aparte (comprobantes, pagos) va al programa o navegador del sistema.</text>
+  <path d="M800 152V186" class="l"/>
+  <path d="M800 186V156" class="l"/>
+
+  <rect x="350" y="330" width="580" height="80" class="caja ext"/>
+  <text x="366" y="356" class="t">Servidores de la universidad (sin cambios)</text>
+  <text x="366" y="378" class="s">miportal.kennedy.edu.ar · servicios.kennedy.edu.ar (páginas y .xap)</text>
+  <text x="366" y="396" class="s">servicios1/servicios2.kennedy.edu.ar (servicios de Académico y Cuentas Corrientes)</text>
+  <path d="M640 280V326" class="l"/>
+  <path d="M380 152V172H320V370H346" class="l" stroke-dasharray="5 4"/>
+  <text x="30" y="350" class="n">Todo corre en tu computadora.</text>
+  <text x="30" y="368" class="n">No hay servidores intermedios:</text>
+  <text x="30" y="386" class="n">la app habla directo con la universidad.</text>
+</svg>

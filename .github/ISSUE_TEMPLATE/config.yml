@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Problema de seguridad
+    url: https://github.com/JuaniVeltri/ukennedy-miportal-app/security/advisories/new
+    about: Reportalo en privado, no en un issue público.
+  - name: Consultas sobre tu cursada, inscripción o pagos
+    url: https://miportal.kennedy.edu.ar/
+    about: Este proyecto no es la universidad. Para trámites, consultá a la Universidad Kennedy.
