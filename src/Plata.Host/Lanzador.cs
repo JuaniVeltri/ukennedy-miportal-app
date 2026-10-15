@@ -22,10 +22,14 @@ public sealed class Lanzador
     /// responde directo. Además avisa a la ventana apenas se hace clic en una app (el enlace llega
     /// recién después de la respuesta del servidor) y le pasa el enlace <c>uksv:</c> en cuanto el
     /// portal lo pone en su iframe: así no depende de que el navegador cargue un esquema propio
-    /// dentro de una página https (en macOS lo bloquea).
+    /// dentro de una página https (en macOS lo bloquea). En el formulario de inicio de sesión agrega
+    /// "Recordarme en este equipo" y, si hay una cuenta recordada, "Iniciar sesión como …" (la cuenta
+    /// la guarda el host en el llavero del sistema, ver <see cref="Credenciales"/>). Solo corre en
+    /// páginas web: no en la ventana ni en las pestañas de las apps.
     /// </summary>
     public const string ScriptDelPortal = """
         (function () {
+          if (!/^https?:$/.test(location.protocol)) return;
           if (typeof checkUKSVCookie === 'function') window.checkUKSVCookie = function () { return true; };
           if (window.parent === window) return;
           document.addEventListener('click', function (e) {
@@ -46,6 +50,57 @@ public sealed class Lanzador
               else for (var i = 0; i < c.addedNodes.length; i++) revisar(c.addedNodes[i]);
             });
           }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] });
+
+          var usuario = document.getElementById('ctl00_login_txtUser');
+          var clave = document.getElementById('ctl00_login_txtPasswd');
+          var entrar = document.getElementById('ctl00_login_btnEnviar');
+          if (!usuario || !clave || !entrar) return;
+          window.addEventListener('message', function (e) {
+            if (e.source !== window.parent || !e.data || !e.data.plataCuenta) return;
+            var c = e.data.plataCuenta;
+            if (c.tipo === 'cuenta' && c.disponible) recordarme(c.usuario || null);
+            if (c.tipo === 'cuenta-clave' && c.usuario && c.clave) {
+              usuario.value = c.usuario;
+              clave.value = c.clave;
+              entrar.click();
+            }
+          });
+          window.parent.postMessage({ plataCuenta: 'consultar' }, '*');
+
+          function recordarme(guardado) {
+            var tabla = entrar.closest('table');
+            var celda = tabla.insertRow(-1).insertCell(0);
+            celda.innerHTML = '<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;cursor:pointer">' +
+              '<input type="checkbox" style="margin:0"> Recordarme en este equipo</label>';
+            var tilde = celda.querySelector('input');
+            tilde.checked = !!guardado;
+            entrar.form.addEventListener('submit', function () {
+              if (tilde.checked && usuario.value && clave.value)
+                window.parent.postMessage({ plataCuenta: { guardar: { usuario: usuario.value, clave: clave.value } } }, '*');
+              else if (!tilde.checked && guardado)
+                window.parent.postMessage({ plataCuenta: 'olvidar' }, '*');
+            });
+            if (!guardado) return;
+            var fila = tabla.insertRow(0), arriba = fila.insertCell(0);
+            var boton = document.createElement('input');
+            boton.type = 'button';
+            boton.className = entrar.className;
+            boton.value = 'Iniciar sesión como ' + guardado;
+            boton.style.marginBottom = '4px';
+            boton.addEventListener('click', function () { window.parent.postMessage({ plataCuenta: 'clave' }, '*'); });
+            var otra = document.createElement('a');
+            otra.href = '#';
+            otra.textContent = 'Usar otra cuenta';
+            otra.style.cssText = 'display:block;margin:0 0 12px;font-size:12px';
+            otra.addEventListener('click', function (e) {
+              e.preventDefault();
+              fila.remove();
+              tilde.checked = false;
+              usuario.focus();
+            });
+            arriba.appendChild(boton);
+            arriba.appendChild(otra);
+          }
         })();
         """;
 

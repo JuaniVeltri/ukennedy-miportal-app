@@ -146,6 +146,8 @@ void AbrirPortal(Uri inicio)
                     Process.Start(new ProcessStartInfo(repositorio.AbsoluteUri) { UseShellExecute = true });
                 else if (orden.StartsWith("uksv:", StringComparison.Ordinal))
                     Lanzar(orden, "script del portal");
+                else if (orden.StartsWith("cuenta:", StringComparison.Ordinal))
+                    AtenderCuenta(orden["cuenta:".Length..]);
             }
         })
         .RegisterWindowCreatedHandler((_, _) => Navegador.Preparar(titulo, scripts, Lanzador.Esquema))
@@ -184,6 +186,39 @@ void AbrirPortal(Uri inicio)
             }
         });
     }
+
+    // "Recordarme" del portal: la cuenta va al llavero del sistema (ver Credenciales), fuera del hilo
+    // de la ventana. El registro nunca lleva el usuario ni la contraseña.
+    void AtenderCuenta(string orden) => Task.Run(() =>
+    {
+        var sitio = inicio.Host;
+        try
+        {
+            switch (orden)
+            {
+                case "consultar":
+                    AVentana(new { tipo = "cuenta", disponible = Credenciales.Disponible, usuario = Credenciales.Disponible ? Credenciales.Leer(sitio)?.Usuario : null });
+                    break;
+                case "clave":
+                    var cuenta = Credenciales.Leer(sitio);
+                    AVentana(new { tipo = "cuenta-clave", usuario = cuenta?.Usuario, clave = cuenta?.Clave });
+                    break;
+                case "olvidar":
+                    Credenciales.Olvidar(sitio);
+                    Console.WriteLine("cuenta recordada: borrada");
+                    break;
+                default:
+                    if (!orden.StartsWith("guardar:", StringComparison.Ordinal)) return;
+                    var o = JsonSerializer.Deserialize<JsonElement>(orden["guardar:".Length..]);
+                    var (usuario, clave) = (o.GetProperty("usuario").GetString(), o.GetProperty("clave").GetString());
+                    if (string.IsNullOrEmpty(usuario) || string.IsNullOrEmpty(clave)) return;
+                    Credenciales.Guardar(sitio, new Cuenta(usuario, clave));
+                    Console.WriteLine("cuenta recordada: guardada en el llavero");
+                    break;
+            }
+        }
+        catch (Exception e) { Console.WriteLine("cuenta recordada: " + e.Message); }
+    });
 
     string? SinMarca(string m, string prefijo)
         => m.StartsWith(prefijo + marca + ":", StringComparison.Ordinal) ? m[(prefijo.Length + marca.Length + 1)..] : null;

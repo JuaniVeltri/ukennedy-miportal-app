@@ -83,6 +83,7 @@
 (function () {
   'use strict';
   var TOKEN = '__TOKEN__';
+  var ORIGEN_PORTAL = new URL('__PORTAL__').origin;
   var pestanas = new Map(); // id -> { pestana, marco, app }
   var activa = null;
 
@@ -185,6 +186,13 @@
       enviar('plata-ventana:' + TOKEN + ':uksv:' + e.data.plataUksv);
       return;
     }
+    // "Recordarme" del inicio de sesión del portal: la cuenta la guarda el host en el llavero.
+    if (portal && e.source === portal.marco.contentWindow && e.data.plataCuenta) {
+      var c = e.data.plataCuenta;
+      if (c === 'consultar' || c === 'clave' || c === 'olvidar') enviar('plata-ventana:' + TOKEN + ':cuenta:' + c);
+      else if (c.guardar) enviar('plata-ventana:' + TOKEN + ':cuenta:guardar:' + JSON.stringify(c.guardar));
+      return;
+    }
     if (typeof e.data.plata !== 'string') return;
     pestanas.forEach(function (p, id) {
       if (!p.app || p.marco.contentWindow !== e.source) return;
@@ -209,6 +217,10 @@
     if (o.tipo === 'abriendo') modal('Abriendo aplicaci\u00f3n\u2026');
     if (o.tipo === 'app') { modal(null); crear(o.id, o.titulo, o.url, true); }
     if (o.tipo === 'error') modal(o.texto, true);
+    if (o.tipo === 'cuenta' || o.tipo === 'cuenta-clave') {
+      var portal = pestanas.get('portal');
+      if (portal) portal.marco.contentWindow.postMessage({ plataCuenta: o }, ORIGEN_PORTAL);
+    }
   });
 
   document.getElementById('recargar').addEventListener('click', function () {
