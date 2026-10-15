@@ -20,7 +20,9 @@ public sealed class Lanzador
     /// botón "Si ya instalaste el visor hacé clic aquí"). En Plata el visor está, pero el portal
     /// corre en un marco y el navegador no le deja leer ni escribir cookies desde JavaScript: se
     /// responde directo. Además avisa a la ventana apenas se hace clic en una app (el enlace llega
-    /// recién después de la respuesta del servidor).
+    /// recién después de la respuesta del servidor) y le pasa el enlace <c>uksv:</c> en cuanto el
+    /// portal lo pone en su iframe: así no depende de que el navegador cargue un esquema propio
+    /// dentro de una página https (en macOS lo bloquea).
     /// </summary>
     public const string ScriptDelPortal = """
         (function () {
@@ -30,6 +32,20 @@ public sealed class Lanzador
             var a = e.target && e.target.closest && e.target.closest('a[onclick*="checkConditions"]');
             if (a) window.parent.postMessage({ plataPortal: 'abriendo' }, '*');
           }, true);
+          function revisar(nodo) {
+            if (!nodo || nodo.nodeType !== 1) return;
+            var marcos = nodo.tagName === 'IFRAME' ? [nodo] : nodo.querySelectorAll('iframe');
+            for (var i = 0; i < marcos.length; i++) {
+              var src = marcos[i].getAttribute('src') || '';
+              if (/^uksv:/i.test(src)) window.parent.postMessage({ plataUksv: src }, '*');
+            }
+          }
+          new MutationObserver(function (cambios) {
+            cambios.forEach(function (c) {
+              if (c.type === 'attributes') revisar(c.target);
+              else for (var i = 0; i < c.addedNodes.length; i++) revisar(c.addedNodes[i]);
+            });
+          }).observe(document.documentElement, { subtree: true, childList: true, attributes: true, attributeFilter: ['src'] });
         })();
         """;
 

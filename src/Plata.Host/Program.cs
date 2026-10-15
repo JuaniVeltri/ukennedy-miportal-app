@@ -7,6 +7,13 @@ using System.Text.Json;
 using Photino.NET;
 using Plata.Host;
 
+// Una app empaquetada trae sus argumentos en argumentos.txt, al lado del ejecutable: abierta desde el
+// Finder o el menú no recibe ninguno. Los de la línea de comandos van primero y mandan.
+if (Path.Combine(AppContext.BaseDirectory, "argumentos.txt") is var archivoDeArgumentos && File.Exists(archivoDeArgumentos))
+    args = args.Concat(File.ReadAllLines(archivoDeArgumentos).Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith('#'))).ToArray();
+// Registro en un archivo (además de la consola): sin consola, es lo único que queda para ver qué pasó.
+if (ArgOf(args, "--registro") is { } registro) Registro.Iniciar(registro);
+
 var motor = new ServidorDeArchivos(ArgOf(args, "--motor") ?? Path.Combine(AppContext.BaseDirectory, "motor"));
 // Red de las apps: solo los dominios permitidos (separados por coma), p. ej. "kennedy.edu.ar".
 var portero = new Portero((ArgOf(args, "--permitir") ?? "").Split(','));
@@ -18,6 +25,8 @@ var diagnostico = args.Contains("--diagnostico");
 // Cómo se presenta la app (título de la ventana, marca de la barra) y dónde está su código fuente.
 // Las apps empaquetadas los fijan en su lanzador; sin ellos, es Plata.
 var nombre = ArgOf(args, "--nombre") ?? "Plata";
+// Ícono de la ventana (relativo al ejecutable si no es una ruta completa).
+var icono = ArgOf(args, "--icono") is { } ic && Path.Combine(AppContext.BaseDirectory, ic) is var ri && File.Exists(ri) ? ri : null;
 var repositorio = ArgOf(args, "--repo") is { } r && Uri.TryCreate(r, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps ? u : null;
 // La red de las apps sigue las reglas de Silverlight (clientaccesspolicy.xml).
 var politica = new PoliticaDeAcceso(portero.TraerPoliticaAsync);
@@ -61,6 +70,7 @@ void AbrirApp()
             => sesion.Resolver(url, out ct) ?? Stream.Null)
         .RegisterWebMessageReceivedHandler((_, m) => sesion.Atender(m, r => win!.SendWebMessage(r)))
         .Load(new Uri(sesion.Direccion("app")));
+    if (icono is not null) win.SetIconFile(icono);
     win.WaitForClose();
 }
 
@@ -112,37 +122,11 @@ void AbrirPortal(Uri inicio)
             ct = "text/plain";
             return Stream.Null;
         })
+        // El enlace llega por dos caminos: el script del portal lo avisa apenas lo pone en su iframe, y
+        // en Linux el iframe además lo carga por este esquema. Se lanza una sola vez.
         .RegisterCustomSchemeHandler(Lanzador.Esquema, (object _, string _, string url, out string ct) =>
         {
-            // El portal pone el enlace en un iframe oculto: se atiende aparte para no trabar la ventana.
-            // Las cookies del portal se leen acá (hilo de la ventana): el lanzador las manda como el navegador.
-            bool nuevo;
-            lock (lanzados) nuevo = lanzados.Add(url);
-            if (nuevo && lanzador.Direccion(url) is { } destino)
-            {
-                var cookies = CookiesDelNavegador.ParaAsync(destino);
-                _ = Task.Run(async () =>
-                {
-                    try
-                    {
-                        AVentana(new { tipo = "abriendo" });
-                        var delNavegador = await cookies;
-                        Console.WriteLine($"cookies del portal: {string.Join(" ", delNavegador.Select(c => c.Name + "@" + c.Domain + (c.Secure ? "(segura)" : "")))}; " +
-                                          $"agregadas {portero.AgregarCookies(delNavegador)}");
-                        var l = await lanzador.LanzarAsync(url);
-                        var id = idPorXap.GetOrAdd(l.NombreXap, _ => "app" + (idPorXap.Count + 1));
-                        var sesion = SesionDeApp.Para(l, motor, portero, documentos, politica, diagnostico);
-                        sesiones[id] = sesion;
-                        Console.WriteLine($"lanzada {l.NombreXap} en la pestaña {id} ({l.Titulo})");
-                        AVentana(new { tipo = "app", id, titulo = l.TituloCorto, url = sesion.Direccion(id) });
-                    }
-                    catch (Exception e)
-                    {
-                        Console.WriteLine("lanzador: " + e.Message);
-                        AVentana(new { tipo = "error", texto = "No se pudo abrir la aplicación. " + e.Message });
-                    }
-                });
-            }
+            Lanzar(url, "esquema");
             ct = "text/html";
             return new MemoryStream("<!doctype html><title>Plata</title>"u8.ToArray());
         })
@@ -160,16 +144,46 @@ void AbrirPortal(Uri inicio)
                     sesiones.TryRemove(orden["cerrar:".Length..], out SesionDeApp? _);
                 else if (orden == "codigo" && repositorio is not null)
                     Process.Start(new ProcessStartInfo(repositorio.AbsoluteUri) { UseShellExecute = true });
+                else if (orden.StartsWith("uksv:", StringComparison.Ordinal))
+                    Lanzar(orden, "script del portal");
             }
         })
-        .RegisterWindowCreatedHandler((_, _) =>
-        {
-            WebKitGtk.MarcarEsquemaComoSeguro(Lanzador.Esquema);
-            WebKitGtk.AceptarCookiesDeTerceros();
-            WebKitGtk.AgregarScript(titulo, scripts);
-        })
+        .RegisterWindowCreatedHandler((_, _) => Navegador.Preparar(titulo, scripts, Lanzador.Esquema))
         .Load(new Uri("plata://plata/"));
+    if (icono is not null) win.SetIconFile(icono);
     win.WaitForClose();
+
+    // Abre la app del enlace en una pestaña. Se llama en el hilo de la ventana: ahí se leen las
+    // cookies del portal, que el lanzador manda como lo haría el navegador.
+    void Lanzar(string url, string via)
+    {
+        bool nuevo;
+        lock (lanzados) nuevo = lanzados.Add(url);
+        if (!nuevo || lanzador.Direccion(url) is not { } destino) return;
+        Console.WriteLine("enlace de app recibido por " + via);
+        var cookies = CookiesDelNavegador.ParaAsync(destino);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                AVentana(new { tipo = "abriendo" });
+                var delNavegador = await cookies;
+                Console.WriteLine($"cookies del portal: {string.Join(" ", delNavegador.Select(c => c.Name + "@" + c.Domain + (c.Secure ? "(segura)" : "")))}; " +
+                                  $"agregadas {portero.AgregarCookies(delNavegador)}");
+                var l = await lanzador.LanzarAsync(url);
+                var id = idPorXap.GetOrAdd(l.NombreXap, _ => "app" + (idPorXap.Count + 1));
+                var sesion = SesionDeApp.Para(l, motor, portero, documentos, politica, diagnostico);
+                sesiones[id] = sesion;
+                Console.WriteLine($"lanzada {l.NombreXap} en la pestaña {id} ({l.Titulo})");
+                AVentana(new { tipo = "app", id, titulo = l.TituloCorto, url = sesion.Direccion(id) });
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("lanzador: " + e.Message);
+                AVentana(new { tipo = "error", texto = "No se pudo abrir la aplicación. " + e.Message });
+            }
+        });
+    }
 
     string? SinMarca(string m, string prefijo)
         => m.StartsWith(prefijo + marca + ":", StringComparison.Ordinal) ? m[(prefijo.Length + marca.Length + 1)..] : null;

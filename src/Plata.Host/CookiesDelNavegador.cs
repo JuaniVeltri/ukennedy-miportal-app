@@ -5,9 +5,9 @@ using System.Runtime.InteropServices;
 namespace Plata.Host;
 
 /// <summary>
-/// Lee las cookies que el portal dejó en el navegador de la ventana (WebKitGTK, Linux). Algunas apps
-/// solo abren con cookies que el portal pone al hacer clic (p. ej. un token de acceso): el lanzador
-/// tiene que mandarlas como lo haría el navegador. Hay que llamarlo desde el hilo de la ventana.
+/// Lee las cookies que el portal dejó en el navegador de la ventana (WebKitGTK en Linux, WKWebView
+/// en macOS): la sesión del alumno viaja en ellas y el lanzador tiene que mandarlas como lo haría el
+/// navegador. Hay que llamarlo desde el hilo de la ventana.
 /// </summary>
 public static class CookiesDelNavegador
 {
@@ -23,9 +23,13 @@ public static class CookiesDelNavegador
     private static readonly Dictionary<IntPtr, TaskCompletionSource<IReadOnlyList<Cookie>>> Pendientes = new();
     private static long _siguiente;
 
-    /// <summary>Las cookies que el navegador mandaría a <paramref name="url"/>. Vacío fuera de Linux.</summary>
+    /// <summary>
+    /// Las cookies que el navegador mandaría a <paramref name="url"/> (en macOS, todas: el Portero
+    /// solo acepta las de dominios permitidos). Vacío en otros sistemas.
+    /// </summary>
     public static Task<IReadOnlyList<Cookie>> ParaAsync(Uri url)
     {
+        if (OperatingSystem.IsMacOS()) return WebKitMac.CookiesAsync();
         if (!OperatingSystem.IsLinux()) return Task.FromResult<IReadOnlyList<Cookie>>([]);
         var tcs = new TaskCompletionSource<IReadOnlyList<Cookie>>(TaskCreationOptions.RunContinuationsAsynchronously);
         var id = (IntPtr)Interlocked.Increment(ref _siguiente);

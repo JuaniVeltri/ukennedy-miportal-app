@@ -181,6 +181,10 @@
     if (!e.data) return;
     var portal = pestanas.get('portal');
     if (portal && e.source === portal.marco.contentWindow && e.data.plataPortal === 'abriendo') { modal('Abriendo aplicaci\u00f3n\u2026'); return; }
+    if (portal && e.source === portal.marco.contentWindow && typeof e.data.plataUksv === 'string') {
+      enviar('plata-ventana:' + TOKEN + ':uksv:' + e.data.plataUksv);
+      return;
+    }
     if (typeof e.data.plata !== 'string') return;
     pestanas.forEach(function (p, id) {
       if (!p.app || p.marco.contentWindow !== e.source) return;
