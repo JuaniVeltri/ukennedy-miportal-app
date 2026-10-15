@@ -15,6 +15,10 @@ var documentos = new Documentos(portero.Permitido, portero.TraerDocumentoAsync,
     a => Process.Start(new ProcessStartInfo(a) { UseShellExecute = true }),
     Path.Combine(Path.GetTempPath(), "plata-documentos"));
 var diagnostico = args.Contains("--diagnostico");
+// Cómo se presenta la app (título de la ventana, marca de la barra) y dónde está su código fuente.
+// Las apps empaquetadas los fijan en su lanzador; sin ellos, es Plata.
+var nombre = ArgOf(args, "--nombre") ?? "Plata";
+var repositorio = ArgOf(args, "--repo") is { } r && Uri.TryCreate(r, UriKind.Absolute, out var u) && u.Scheme == Uri.UriSchemeHttps ? u : null;
 // La red de las apps sigue las reglas de Silverlight (clientaccesspolicy.xml).
 var politica = new PoliticaDeAcceso(portero.TraerPoliticaAsync);
 
@@ -48,7 +52,7 @@ void AbrirApp()
 
     PhotinoWindow? win = null;
     win = new PhotinoWindow()
-        .SetTitle(lanzamiento?.Titulo is { Length: > 0 } t ? "Plata · " + t : "Plata")
+        .SetTitle(lanzamiento?.Titulo is { Length: > 0 } t ? nombre + " · " + t : nombre)
         .SetUseOsDefaultSize(false)
         .SetSize(1280, 800)
         .Center()
@@ -62,12 +66,18 @@ void AbrirApp()
 
 void AbrirPortal(Uri inicio)
 {
-    const string Titulo = "Plata";
+    var titulo = nombre;
+    // "Nombre (aclaración)": la aclaración va aparte en la barra, como etiqueta.
+    var parentesis = nombre.EndsWith(')') ? nombre.LastIndexOf(" (", StringComparison.Ordinal) : -1;
     // Los mensajes de la ventana llevan esta marca: solo la página de la ventana la conoce (los
     // marcos del portal y de las apps son de otro origen y no pueden leerla).
     var marca = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
     var html = Recurso("ventana.html")
         .Replace("__TOKEN__", marca)
+        .Replace("__NOMBRE__", System.Net.WebUtility.HtmlEncode(nombre))
+        .Replace("__MARCA__", System.Net.WebUtility.HtmlEncode(parentesis > 0 ? nombre[..parentesis] : nombre))
+        .Replace("__ETIQUETA__", System.Net.WebUtility.HtmlEncode(parentesis > 0 ? nombre[(parentesis + 2)..^1] : ""))
+        .Replace("__CON_REPO__", repositorio is null ? "false" : "true")
         .Replace("__PORTAL_TITULO__", JavaScriptEncoder.Default.Encode(ArgOf(args, "--portal-nombre") ?? "Portal"))
         .Replace("__PORTAL__", JavaScriptEncoder.Default.Encode(inicio.AbsoluteUri));
     // Scripts que corren en el portal: el que le dice que el visor está instalado y, para
@@ -82,7 +92,7 @@ void AbrirPortal(Uri inicio)
     void AVentana(object o) => win!.SendWebMessage("plata-ventana:" + JsonSerializer.Serialize(o));
 
     win = new PhotinoWindow()
-        .SetTitle(Titulo)
+        .SetTitle(titulo)
         .SetUseOsDefaultSize(false)
         .SetSize(1280, 840)
         .Center()
@@ -144,14 +154,19 @@ void AbrirPortal(Uri inicio)
                 var id = resto[..i];
                 if (sesiones.TryGetValue(id, out var s)) s.Atender(resto[(i + 1)..], r => win!.SendWebMessage($"plata-app:{id}:{r}"));
             }
-            else if (SinMarca(m, "plata-ventana:") is { } orden && orden.StartsWith("cerrar:", StringComparison.Ordinal))
-                sesiones.TryRemove(orden["cerrar:".Length..], out SesionDeApp? _);
+            else if (SinMarca(m, "plata-ventana:") is { } orden)
+            {
+                if (orden.StartsWith("cerrar:", StringComparison.Ordinal))
+                    sesiones.TryRemove(orden["cerrar:".Length..], out SesionDeApp? _);
+                else if (orden == "codigo" && repositorio is not null)
+                    Process.Start(new ProcessStartInfo(repositorio.AbsoluteUri) { UseShellExecute = true });
+            }
         })
         .RegisterWindowCreatedHandler((_, _) =>
         {
             WebKitGtk.MarcarEsquemaComoSeguro(Lanzador.Esquema);
             WebKitGtk.AceptarCookiesDeTerceros();
-            WebKitGtk.AgregarScript(Titulo, scripts);
+            WebKitGtk.AgregarScript(titulo, scripts);
         })
         .Load(new Uri("plata://plata/"));
     win.WaitForClose();
