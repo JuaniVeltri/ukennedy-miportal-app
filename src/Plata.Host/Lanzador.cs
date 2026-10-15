@@ -70,8 +70,14 @@ public sealed class Lanzador
           function recordarme(guardado) {
             var tabla = entrar.closest('table');
             var celda = tabla.insertRow(-1).insertCell(0);
-            celda.innerHTML = '<label style="display:flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;cursor:pointer">' +
-              '<input type="checkbox" style="margin:0"> Recordarme en este equipo</label>';
+            // Estilos propios con !important: los del portal (pensados para sus campos) no los pisan.
+            celda.innerHTML = '<label style="display:flex!important;align-items:center!important;justify-content:flex-start!important;' +
+              'gap:8px!important;width:auto!important;margin:12px 0 0!important;padding:0!important;font-size:13px!important;' +
+              'font-weight:normal!important;line-height:1.2!important;color:#3a3f45!important;cursor:pointer!important">' +
+              '<input type="checkbox" style="-webkit-appearance:checkbox!important;appearance:auto!important;width:15px!important;' +
+              'height:15px!important;min-width:0!important;max-width:15px!important;margin:0!important;padding:0!important;' +
+              'flex:none!important;border:0!important;box-shadow:none!important;accent-color:#ae0f0a!important">' +
+              '<span>Recordarme en este equipo</span></label>';
             var tilde = celda.querySelector('input');
             tilde.checked = !!guardado;
             entrar.form.addEventListener('submit', function () {
@@ -86,12 +92,13 @@ public sealed class Lanzador
             boton.type = 'button';
             boton.className = entrar.className;
             boton.value = 'Iniciar sesión como ' + guardado;
-            boton.style.marginBottom = '4px';
+            boton.style.cssText = 'margin:0!important';
             boton.addEventListener('click', function () { window.parent.postMessage({ plataCuenta: 'clave' }, '*'); });
             var otra = document.createElement('a');
             otra.href = '#';
             otra.textContent = 'Usar otra cuenta';
-            otra.style.cssText = 'display:block;margin:0 0 12px;font-size:12px';
+            otra.style.cssText = 'display:block!important;margin:8px 0 18px!important;font-size:12.5px!important;' +
+              'text-align:center!important;color:#5f6770!important;text-decoration:underline!important';
             otra.addEventListener('click', function (e) {
               e.preventDefault();
               fila.remove();
