@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
       - name: Carga de trabajo de WebAssembly
@@ -40,7 +40,7 @@ jobs:
       MACOS_NOTARIZACION_ISSUER_ID: ${{ secrets.MACOS_NOTARIZACION_ISSUER_ID }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
       - name: Carga de trabajo de WebAssembly
