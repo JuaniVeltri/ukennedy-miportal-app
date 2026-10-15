@@ -40,20 +40,23 @@ internal static class WebKitGtk
             webkit_user_script_unref(script);
         });
 
-    // Photino no da la vista en Linux: se la busca dentro de la ventana con ese título.
+    // Photino no da la vista en Linux: se la busca entre las ventanas del proceso. Primero la que
+    // tiene ese título; si no aparece (el título puede no estar puesto todavía), la única vista.
     private static IntPtr? BuscarVista(string titulo)
     {
         var lista = gtk_window_list_toplevels();
         try
         {
+            var vistas = new List<(string? Titulo, IntPtr Vista)>();
             for (var nodo = lista; nodo != IntPtr.Zero; nodo = Marshal.ReadIntPtr(nodo, IntPtr.Size))
             {
                 var ventana = Marshal.ReadIntPtr(nodo);
-                if (Marshal.PtrToStringUTF8(gtk_window_get_title(ventana)) != titulo) continue;
                 var hijo = gtk_bin_get_child(ventana);
-                if (hijo != IntPtr.Zero && Marshal.PtrToStringUTF8(g_type_name_from_instance(hijo)) == "WebKitWebView") return hijo;
+                if (hijo != IntPtr.Zero && Marshal.PtrToStringUTF8(g_type_name_from_instance(hijo)) == "WebKitWebView")
+                    vistas.Add((Marshal.PtrToStringUTF8(gtk_window_get_title(ventana)), hijo));
             }
-            return null;
+            if (vistas.FirstOrDefault(v => v.Titulo == titulo) is { Vista: not 0 } conTitulo) return conTitulo.Vista;
+            return vistas.Count == 1 ? vistas[0].Vista : null;
         }
         finally { g_list_free(lista); }
     }
