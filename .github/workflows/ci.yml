@@ -76,7 +76,7 @@ jobs:
           fi
       - name: Armar el .dmg
         run: empaquetado/macos/empaquetar.sh 0.1.0 arm64
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ukennedy-miportal-app-macos-arm64
           path: dist/*.dmg
@@ -100,7 +100,7 @@ jobs:
         run: dotnet workload install wasm-tools
       - name: Armar el .tar.gz
         run: empaquetado/linux/empaquetar.sh 0.1.0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ukennedy-miportal-app-linux-x64
           path: dist/*.tar.gz
