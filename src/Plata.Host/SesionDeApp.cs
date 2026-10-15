@@ -17,12 +17,16 @@ public sealed class SesionDeApp
     private readonly ServidorDeArchivos _motor;
     private readonly Portero _portero;
     private readonly Documentos _documentos;
+    private readonly PoliticaDeAcceso? _politica;
 
-    public SesionDeApp(ServidorDeArchivos motor, Portero portero, Documentos documentos)
+    /// <param name="politica">Reglas de Silverlight para la red de la app; sin ellas (o sin saber de
+    /// dónde vino el .xap), la app solo llega a los dominios permitidos del Portero.</param>
+    public SesionDeApp(ServidorDeArchivos motor, Portero portero, Documentos documentos, PoliticaDeAcceso? politica = null)
     {
         _motor = motor;
         _portero = portero;
         _documentos = documentos;
+        _politica = politica;
     }
 
     /// <summary>El .xap a cargar: nombre de archivo (relativo al motor o al lanzamiento).</summary>
@@ -40,8 +44,9 @@ public sealed class SesionDeApp
     public Lanzamiento? Lanzamiento { get; init; }
     public bool Diagnostico { get; init; }
 
-    public static SesionDeApp Para(Lanzamiento l, ServidorDeArchivos motor, Portero portero, Documentos documentos, bool diagnostico = false)
-        => new(motor, portero, documentos)
+    public static SesionDeApp Para(Lanzamiento l, ServidorDeArchivos motor, Portero portero, Documentos documentos,
+                                   PoliticaDeAcceso? politica = null, bool diagnostico = false)
+        => new(motor, portero, documentos, politica)
         {
             Xap = l.NombreXap,
             InitParams = l.InitParams,
@@ -50,6 +55,9 @@ public sealed class SesionDeApp
             Lanzamiento = l,
             Diagnostico = diagnostico,
         };
+
+    /// <summary>La dirección real del .xap (su sitio de origen), si se sabe.</summary>
+    public Uri? DireccionDelXap => Lanzamiento?.Xap ?? (Origen is not null && Xap is not null ? new Uri(Origen, Xap) : null);
 
     /// <summary>La dirección con la que se abre el motor para esta app.</summary>
     public string Direccion(string id) => $"plata://{id}/" + (Xap is not null ? "?xap=" + Uri.EscapeDataString(Xap) : "");
@@ -82,7 +90,10 @@ public sealed class SesionDeApp
         }
         if (Origen is not null && ruta.StartsWith(RutaDeOrigen, StringComparison.Ordinal))
         {
-            var (datos, tipo) = _portero.TraerAsync(new Uri(Origen, ruta[RutaDeOrigen.Length..])).GetAwaiter().GetResult();
+            // Relativo al .xap: su propio sitio, que Silverlight siempre deja pedir.
+            var destino = new Uri(Origen, ruta[RutaDeOrigen.Length..]);
+            var mismoSitio = destino.GetLeftPart(UriPartial.Authority) == Origen.GetLeftPart(UriPartial.Authority);
+            var (datos, tipo) = _portero.TraerAsync(destino, sinLista: mismoSitio).GetAwaiter().GetResult();
             contentType = tipo;
             return datos is null ? null : new MemoryStream(datos);
         }
@@ -94,7 +105,10 @@ public sealed class SesionDeApp
     {
         if (mensaje.StartsWith(Red, StringComparison.Ordinal))
         {
-            _ = Task.Run(async () => responder(Red + await _portero.AtenderAsync(mensaje[Red.Length..])));
+            var autorizar = DireccionDelXap is { } xap && _politica is { } politica
+                ? (Func<Uri, IReadOnlyCollection<string>, Task<bool>>)((url, cabeceras) => politica.PermiteAsync(xap, url, cabeceras))
+                : null;
+            _ = Task.Run(async () => responder(Red + await _portero.AtenderAsync(mensaje[Red.Length..], autorizar)));
             return;
         }
         if (mensaje.StartsWith(Abrir, StringComparison.Ordinal))

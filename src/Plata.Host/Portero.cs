@@ -8,8 +8,10 @@ namespace Plata.Host;
 /// <summary>
 /// Hace la red de las apps (diseño, §4.8). El motor, encerrado en el navegador, manda cada
 /// pedido HTTP como mensaje; acá se hace la conexión real y se devuelve la respuesta.
-/// Solo se atienden dominios permitidos de forma explícita (y sus subdominios). Las cookies
-/// viven solo en memoria. No se registran direcciones con parámetros ni contenidos.
+/// Lo que pide el host (portal, lanzador, .xap, documentos) solo va a dominios permitidos de forma
+/// explícita (y sus subdominios); lo que pide una app sigue las reglas de Silverlight
+/// (<see cref="PoliticaDeAcceso"/>). Las cookies viven solo en memoria. No se registran
+/// direcciones con parámetros ni contenidos.
 /// </summary>
 public sealed class Portero
 {
@@ -37,16 +39,24 @@ public sealed class Portero
         return _dominios.Any(d => host == d || host.EndsWith("." + d, StringComparison.Ordinal));
     }
 
-    /// <summary>Atiende un pedido (JSON) y devuelve la respuesta (JSON). Nunca lanza.</summary>
-    public async Task<string> AtenderAsync(string pedidoJson)
+    /// <summary>
+    /// Atiende un pedido (JSON) y devuelve la respuesta (JSON). Nunca lanza. Si se da
+    /// <paramref name="autorizar"/> (dirección y nombres de cabeceras), decide él en vez de la
+    /// lista de dominios permitidos.
+    /// </summary>
+    public async Task<string> AtenderAsync(string pedidoJson, Func<Uri, IReadOnlyCollection<string>, Task<bool>>? autorizar = null)
     {
         Pedido? p = null;
         try
         {
             p = JsonSerializer.Deserialize<Pedido>(pedidoJson, Json)!;
             var url = new Uri(p.Url);
-            if (!Permitido(url))
-                return Responder(p.Id, error: $"dominio no permitido: {url.Host}");
+            if (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps)
+                return Responder(p.Id, error: $"esquema no permitido: {url.Scheme}");
+            if (autorizar is null ? !Permitido(url)
+                : !await autorizar(url, (p.Cabeceras ?? []).Where(c => c.Length == 2).Select(c => c[0]).ToArray()))
+                return Responder(p.Id, error: autorizar is null ? $"dominio no permitido: {url.Host}"
+                    : $"acceso entre dominios no permitido por la política de {url.Host}");
 
             using var pedido = new HttpRequestMessage(new HttpMethod(p.Metodo), url);
             if (p.Cuerpo is { Length: > 0 }) pedido.Content = new ByteArrayContent(Convert.FromBase64String(p.Cuerpo));
@@ -76,9 +86,9 @@ public sealed class Portero
     /// Trae un archivo (p. ej. una imagen relativa al .xap) del sitio de origen.
     /// Devuelve null si el dominio no está permitido o si la respuesta no es exitosa.
     /// </summary>
-    public async Task<(byte[]? Datos, string Tipo)> TraerAsync(Uri url)
+    public async Task<(byte[]? Datos, string Tipo)> TraerAsync(Uri url, bool sinLista = false)
     {
-        if (!Permitido(url)) return (null, "text/plain");
+        if (!sinLista && !Permitido(url)) return (null, "text/plain");
         try
         {
             using var r = await _http.GetAsync(url);
@@ -87,6 +97,25 @@ public sealed class Portero
             return (await r.Content.ReadAsByteArrayAsync(), tipo);
         }
         catch (HttpRequestException) { return (null, "text/plain"); }
+    }
+
+    /// <summary>
+    /// Trae un archivo de política entre dominios (<c>/clientaccesspolicy.xml</c>,
+    /// <c>/crossdomain.xml</c>) de cualquier sitio, como hacía Silverlight antes de llamarlo.
+    /// Null si no existe o no es XML.
+    /// </summary>
+    public async Task<string?> TraerPoliticaAsync(Uri url)
+    {
+        if (url.Scheme != Uri.UriSchemeHttp && url.Scheme != Uri.UriSchemeHttps) return null;
+        try
+        {
+            using var r = await _http.GetAsync(url);
+            if (!r.IsSuccessStatusCode) return null;
+            var texto = await r.Content.ReadAsStringAsync();
+            return texto.TrimStart('\uFEFF', ' ', '\r', '\n', '\t').StartsWith('<') ? texto.TrimStart('\uFEFF') : null;
+        }
+        catch (HttpRequestException) { return null; }
+        catch (TaskCanceledException) { return null; }
     }
 
     /// <summary>
