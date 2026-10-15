@@ -33,6 +33,27 @@ public sealed class CargadorDeApp
         return entry.GetType(pkg.Manifest.EntryPointType, throwOnError: true)!;
     }
 
+    /// <summary>
+    /// Carga una librería que la app trae en tiempo de ejecución (<c>AssemblyPart.Load</c>):
+    /// la traduce como las del .xap. Si ya está cargada devuelve esa (no se duplican tipos);
+    /// las del SDK que provee OpenSilver y los recursos de idioma no se cargan (null).
+    /// </summary>
+    public Assembly? CargarEnsamblado(byte[] bytes)
+    {
+        InstalarResolver();
+        string nombre;
+        using (var mod = Mono.Cecil.ModuleDefinition.ReadModule(new MemoryStream(bytes)))
+            nombre = mod.Assembly.Name.Name;
+        if (_cargadas.TryGetValue(nombre, out var ya)) return ya;
+        if (MapaDeEnsamblados.EsProvistoPorOpenSilver(nombre) ||
+            nombre.EndsWith(".resources", StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        var asm = Assembly.Load(_retargeter.Traducir(bytes, out _));
+        _cargadas[nombre] = asm;
+        return asm;
+    }
+
     // Las librerías cargadas por bytes no se encuentran por nombre: este resolvedor
     // se las sirve al runtime cuando una referencia a otra se necesita.
     private void InstalarResolver()

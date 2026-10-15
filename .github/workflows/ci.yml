@@ -1,7 +1,16 @@
-name: ci
-on: [push, pull_request]
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
 jobs:
-  build:
+  compilar-y-probar:
+    name: Compilar y probar (${{ matrix.os }})
     strategy:
       fail-fast: false
       matrix:
@@ -11,11 +20,88 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.0.x'
-      - name: Instalar workload wasm-tools
+          dotnet-version: 10.0.x
+      - name: Carga de trabajo de WebAssembly
         run: dotnet workload install wasm-tools
-      - name: Dependencias Linux (WebKitGTK)
+      - name: Dependencias de Linux (WebKitGTK)
         if: matrix.os == 'ubuntu-latest'
         run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-0 libgtk-3-0
-      - run: dotnet build Plata.slnx -c Release
-      - run: dotnet test Plata.slnx -c Release --no-build
+      - name: Compilar
+        run: dotnet build Plata.slnx -c Release
+      - name: Pruebas
+        run: dotnet test Plata.slnx -c Release --no-build
+      - name: Pruebas de la extensión
+        if: matrix.os == 'ubuntu-latest'
+        working-directory: extension
+        run: node --test
+
+  # Paquetes para probar cada cambio: se bajan desde la página de la ejecución (Artifacts).
+  paquete-macos:
+    name: Paquete de macOS (Apple Silicon)
+    needs: compilar-y-probar
+    runs-on: macos-latest
+    env:
+      # Firma y notarización de Apple: solo si el repositorio tiene los secretos (ver CONTRIBUTING.md).
+      TIENE_CERTIFICADO: ${{ secrets.MACOS_CERTIFICADO_P12 != '' }}
+      MACOS_NOTARIZACION_KEY_ID: ${{ secrets.MACOS_NOTARIZACION_KEY_ID }}
+      MACOS_NOTARIZACION_ISSUER_ID: ${{ secrets.MACOS_NOTARIZACION_ISSUER_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Carga de trabajo de WebAssembly
+        run: dotnet workload install wasm-tools
+      - name: Certificado de Apple (si el repositorio lo tiene)
+        if: env.TIENE_CERTIFICADO == 'true'
+        env:
+          CERTIFICADO: ${{ secrets.MACOS_CERTIFICADO_P12 }}
+          CLAVE: ${{ secrets.MACOS_CERTIFICADO_CLAVE }}
+          P8: ${{ secrets.MACOS_NOTARIZACION_P8 }}
+        run: |
+          LLAVERO="$RUNNER_TEMP/firma.keychain-db"
+          security create-keychain -p temporal "$LLAVERO"
+          security set-keychain-settings -lut 21600 "$LLAVERO"
+          security unlock-keychain -p temporal "$LLAVERO"
+          printf '%s' "$CERTIFICADO" | base64 --decode > "$RUNNER_TEMP/certificado.p12"
+          security import "$RUNNER_TEMP/certificado.p12" -k "$LLAVERO" -P "$CLAVE" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificado.p12"
+          security set-key-partition-list -S apple-tool:,apple: -k temporal "$LLAVERO" >/dev/null
+          security list-keychains -d user -s "$LLAVERO" $(security list-keychains -d user | tr -d '"')
+          IDENTIDAD=$(security find-identity -v -p codesigning "$LLAVERO" | grep "Developer ID Application" | head -1 | sed -E 's/.*"(.*)"/\1/')
+          echo "MACOS_IDENTIDAD=$IDENTIDAD" >> "$GITHUB_ENV"
+          if [ -n "$P8" ]; then
+            printf '%s' "$P8" > "$RUNNER_TEMP/notarizacion.p8"
+            echo "MACOS_NOTARIZACION_CLAVE=$RUNNER_TEMP/notarizacion.p8" >> "$GITHUB_ENV"
+          fi
+      - name: Armar el .dmg
+        run: empaquetado/macos/empaquetar.sh 0.1.0 arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ukennedy-miportal-app-macos-arm64
+          path: dist/*.dmg
+          retention-days: 14
+      - name: Borrar el llavero temporal
+        if: always() && env.TIENE_CERTIFICADO == 'true'
+        run: |
+          security delete-keychain "$RUNNER_TEMP/firma.keychain-db" || true
+          rm -f "$RUNNER_TEMP/notarizacion.p8"
+
+  paquete-linux:
+    name: Paquete de Linux
+    needs: compilar-y-probar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Carga de trabajo de WebAssembly
+        run: dotnet workload install wasm-tools
+      - name: Armar el .tar.gz
+        run: empaquetado/linux/empaquetar.sh 0.1.0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ukennedy-miportal-app-linux-x64
+          path: dist/*.tar.gz
+          retention-days: 14

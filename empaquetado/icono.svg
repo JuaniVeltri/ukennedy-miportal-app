@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- Ícono de la app: el isotipo de la Universidad Kennedy (marca de la universidad, fuera de la
+       licencia MIT del proyecto) sobre fondo blanco. Tomado de su sitio, kennedy.edu.ar. -->
+  <rect x="32" y="32" width="960" height="960" rx="210" fill="#ffffff"/>
+  <rect x="32.5" y="32.5" width="959" height="959" rx="210" fill="none" stroke="#00000014" stroke-width="2"/>
+  <svg x="152" y="152" width="720" height="720" viewBox="0 0 772.2 772.2">
+    <g fill="#ae0f0a">
+    <path d="M70.6,386.1c0-174.3,141.3-315.5,315.5-315.5s315.6,141.2,315.6,315.5-141.3,315.5-315.6,315.5S70.6,560.4,70.6,386.1M0,386.1c0,213.3,172.9,386.2,386.1,386.2s386.2-172.9,386.2-386.2S599.3,0,386.1,0,0,172.9,0,386.1"/>
+    <path d="M290.8,418.7v-166.1h73.6l.4,175c0,77.5-49,108.7-117.9,108.7s-114.9-33.9-114.9-110.6v-173.1h74v164.6c0,39.7,4.2,62.1,43.2,62.1s41.6-18.5,41.6-60.5Z"/>
+    <path d="M565.2,252.6h77.1l-97.1,114.1,91.4,165h-86l-58.6-109.1-24.7,27.4v81.7h-73.6V252.6h73.6v113.3l97.9-113.3Z"/>
+    </g>
+  </svg>
+</svg>

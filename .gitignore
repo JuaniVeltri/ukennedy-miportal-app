@@ -9,3 +9,6 @@ obj/
 
 # Apps de terceros para prueba local (NO se publican)
 local-corpus/
+
+# Paquetes armados
+dist/

@@ -1,7 +1,6 @@
 # Análisis de compatibilidad — apps de la Universidad Kennedy
 
-Análisis estático de los `.xap` de la universidad, bajo la autorización en
-[`../autorizacion.md`](../autorizacion.md). Los `.xap` **no** están en el
+Análisis estático de los `.xap` de la universidad, con su autorización. Los `.xap` **no** están en el
 repositorio; este documento solo registra su estructura y dependencias.
 
 ## Apps
@@ -187,3 +186,199 @@ Proximos pasos: (1) InitParams representativos; (2) stub de servicios de arranqu
 seguir. El portal no lo entrega a clientes Linux/Mac (bloqueo por sistema operativo
 en el servidor), por lo que el siguiente paso real requiere que el portal lo
 permita (pedido a Sistemas) o un `initParams` de prueba provisto por la universidad.
+
+## Arranque completo con configuración sintética (2026-10-14, cont. 4)
+
+Con un `InitialConfiguration` sintético (armado a partir del código de `Bpf.Silverlight`
+y `GGI.Core`, solo local) el arranque de Académico pasa entero: `Shell.Start` termina,
+`RootVisual` es `Bpf.Silverlight.UI.RootContainer` y en la página queda el árbol real
+de GGI (`RootContainer` → `View` → `SingleShellLayout` → `Grid shellLayout` →
+`Canvas ctrlLayout`).
+
+Qué espera la app al arrancar:
+
+- `InitParams` con dos claves: `InitialConfiguration` (JSON `{"Data":"<xml>"}`) y
+  `SessionData` (JSON con `UserName`, `Roles`, `Privileges`, `Token`).
+- `App.Application_Startup` agrega `Encrypted=True`: todos los valores llegan
+  cifrados (AES) y la app los descifra con una clave embebida en `GGI.Core`. Plata no
+  necesita la clave: pasa los valores tal como los entrega `Launcher.aspx`. El fixture
+  local los cifra igual; la clave no se copia al repositorio.
+- El XML de `Data` nombra por reflexión los tipos a crear: `ConfigurationManagerFactory`,
+  `ServiceFactory` (`WcfServiceProxyFactory`), los `Service` (nombre de la interfaz y
+  dirección), `Shell` (`errorHandlerType`, `securityType`, `ShellLayout`,
+  `ShellApplicationLayout`) y `ApplicationSettings`.
+
+Huecos cubiertos en el camino, todos generales (sirven a cualquier app Silverlight):
+
+1. **InitParams:** el host los recibe con `--init-params <archivo>` y los sirve en
+   `plata://app/_plata/init-params`; el motor los inyecta como
+   `<param name="InitParams">` en `#opensilver-root`, que es de donde los lee
+   OpenSilver. No van por la URL: Photino aborta con URLs largas
+   (`*** buffer overflow detected ***`).
+2. **AES:** .NET en WebAssembly no trae AES (`PlatformNotSupportedException`). El
+   traductor reemplaza `AesManaged` por `Plata.Compat.AesManaged` (CBC + PKCS7,
+   administrado, verificado contra FIPS-197 y contra el AES del sistema).
+3. **`DataContractJsonSerializer`:** vive en la BCL moderna, no en OpenSilver.
+   `System.ServiceModel*` pasa a la reubicación tipo por tipo, y la búsqueda carga el
+   ensamblado moderno por su espacio de nombres si todavía no estaba cargado.
+4. **`ReadObject(Stream)`:** GGI escribe un `MemoryStream` y lo lee sin volver a 0
+   (en Silverlight funcionaba). Se desvía a `Plata.Compat.Desvios`, que rebobina solo
+   un stream que quedó justo al final.
+5. **XAML:** el `Application.LoadComponent` de OpenSilver busca una clase que genera su
+   compilador; con apps de Silverlight no carga nada y no avisa. Se desvía a
+   `Plata.Compat.CargadorDeXaml`, que lee el XAML de `<Ensamblado>.g.resources` y lo
+   aplica sobre la instancia con el lector de XAML de OpenSilver (`RootObjectInstance`,
+   ámbito de nombres para `FindName`, eventos al objeto raíz). Los
+   `clr-namespace:…;assembly=System.Windows*` se mapean al espacio de presentación.
+
+**Frontera actual:** después del login, el shell pide la lista de aplicaciones a
+`IApplicationService` (WCF, `basicHttpBinding`). Sin servidor no llega respuesta y no
+se abre ninguna aplicación. Siguen: imágenes y recursos `/Ensamblado;component/…`,
+`ResourceDictionary Source` y `themes/generic.xaml`, y la red (Portero) con datos
+reales, con autorización de la universidad.
+
+## Académico funcionando con la sesión real (2026-10-15)
+
+Con autorización de la universidad: MiPortal abierto como Windows, el
+`initParams` real de `Gestion.aspx` y la red por el host. **Resultado:** el shell de GGI, el
+menú de sistemas, el menú lateral de Inscripciones y la pantalla **Inscripción a Materias**
+se dibujan con los datos reales del alumno (materias, inscripción vigente, comisiones), igual
+que en la guía de la universidad. Navegar entre materias funciona.
+
+### Red: el Portero (diseño §4.8), variante por mensajes
+
+- El motor no puede usar el `HttpClientHandler` que arma WCF (el navegador no admite esas
+  propiedades) ni llamar a los servidores de la institución (CORS). `Plata.Compat.TransportePlata`
+  reemplaza el transporte HTTP de la binding: arma el sobre SOAP con el encoder y lo manda al
+  host como mensaje `plata-net:{json}`; el host (`Plata.Host.Portero`) hace el pedido real con
+  cookies solo en memoria y **solo a dominios permitidos** (`--permitir kennedy.edu.ar`).
+- Sin WS-Addressing la acción viaja solo en `SOAPAction`: se quita el encabezado SOAP `Action`
+  que agrega el encoder (con él, los servicios respondían HTTP 400).
+- Las respuestas se entregan **en el orden de los pedidos**: GGI muestra una pantalla solo si
+  sus traducciones llegan antes que sus datos (el navegador de la época lo garantizaba en la
+  práctica). Sin esto, a veces la pantalla quedaba en "cargando" para siempre.
+- `WebClient` de Silverlight → `Plata.Compat.WebClient` (por el Portero, relativo al .xap).
+  Los recursos relativos al .xap (imágenes) los sirve el host desde `--origen`.
+
+### WCF en un solo hilo
+
+`ChannelFactory<T>.CreateChannel()`, `Open()` y `Close()` sincrónicos esperan bloqueando
+(`Task.Yield` + `WaitForCompletion`) y el navegador no lo permite; el encoder de texto
+sincrónico hace `WaitOne` y gira para siempre. Se reemplazan por `CanalDiferido` (abre todo
+en forma asincrónica en el primer `BeginX`), `Abort` en vez de `Close`, y las versiones
+asincrónicas del encoder.
+
+### Diferencias de API (Silverlight → OpenSilver / .NET moderno)
+
+| Silverlight | Plata |
+|---|---|
+| `AppDomain.DefineDynamicAssembly`, `DefineDynamicModule(string,bool)` | equivalentes de `AssemblyBuilder` |
+| `ScriptObject.Invoke` de una función que la página no tiene | aviso y `null` |
+| `SilverlightHost` | `System.Windows.Host` de OpenSilver |
+| `Host.Source` (= dirección del .xap) | `Origen.Xap` |
+| `Application.GetResourceStream(StreamResourceInfo, Uri)`, `AssemblyPart.Load(Stream)` (en OpenSilver devuelven null) | lectura del ZIP y carga con el mismo traductor |
+| `Loaded` (llega con el layout hecho) | `Loaded` diferido al Dispatcher + `UpdateLayout` |
+| tipos en argumentos de atributos (`[TemplatePart(Type=…)]`, guardados como texto) | se reubican como las referencias |
+
+### XAML de Silverlight en el lector de OpenSilver
+
+El cargador (`Plata.Compat.CargadorDeXaml`) lee el XAML de `<Ensamblado>.g.resources` y lo
+adapta antes de procesarlo:
+
+- `themes/generic.xaml` de cada ensamblado como tema (`TemaPlata`); `ResourceDictionary Source`
+  (relativos o `/Ensamblado;component/…`) cargados y fusionados.
+- `VisualStateManager.VisualStateGroups` → `plata:Estados.Grupos` (el lector de OpenSilver no
+  crea la colección).
+- Templates: las declaraciones `xmlns` de la raíz viajan al contenido (se procesa al aplicarse,
+  sin ellas); sus `StaticResource` encuentran los recursos de la pantalla por el tema; los
+  eventos (`LoadingRow="…"`) se conectan al code-behind de la pantalla.
+- `x:Name` dentro de recursos también es clave; bindings `OneTime` se reevalúan al cargarse
+  el elemento; `ContentPresenter` sin `Content` en templates de `ContentControl` toma el del
+  control (como en Silverlight).
+
+### Herramientas de desarrollo
+
+- **Arnés con Playwright** (fuera del repo por ahora): corre el motor en Chromium y hace de
+  host; capturas de la página, árbol visual (`PlataArbol`), excepciones con stack (modo
+  `--diagnostico`) y **rastreo de métodos** (el traductor inserta una traza al entrar a los
+  métodos pedidos).
+- Con la sesión real del alumno no se interactúa con la app desde la automatización (la
+  pantalla de inscripción opera sobre datos reales).
+
+### Pendiente (al 2026-10-15, antes del portal integrado)
+
+- ~~Cuentas Corrientes (segundo `.xap`).~~ Abre (ver abajo).
+- ~~Integrar el flujo completo en el host.~~ Hecho (ver abajo).
+- `KeepAliveWebSession`: mantener viva la sesión ASP.NET de la página.
+- Política de dominios: hoy explícita por argumento; falta `clientaccesspolicy.xml`.
+
+## Portal integrado y ventana con pestañas (2026-10-15, cont.)
+
+`Plata.Host --portal https://miportal.kennedy.edu.ar/ --portal-nombre MiPortal --permitir kennedy.edu.ar`
+abre una sola ventana con una barra de pestañas (`src/Plata.Host/Ventana/ventana.html`). La primera
+pestaña es el portal: el alumno inicia sesión ahí como siempre. Al hacer clic en "UK Académico" o
+"UK Cuentas Corrientes", Plata hace lo que hacía el visor de Windows y abre la app en una pestaña
+nueva. Las dos apps abren y cargan datos con la sesión real.
+
+Cómo funciona:
+
+- **User-Agent de Windows** solo en esta ventana (autorizado por la universidad): el portal
+  solo ofrece las apps a Windows.
+- **El enlace `uksv:`.** El portal lo pone en un iframe oculto. Plata registra el esquema `uksv` en
+  el navegador de la ventana. En WebKitGTK un esquema propio cuenta como inseguro y una página
+  https no lo carga en un iframe (contenido mixto): se lo registra como seguro
+  (`webkit_security_manager_register_uri_scheme_as_secure`, `WebKitGtk.cs`).
+- **"¿Tenés el visor instalado?"** El portal lo pregunta con `checkUKSVCookie()`, que busca la
+  cookie `uksvCookie` (la pone su botón "Si ya instalaste el visor hacé clic aquí"). Dentro de la
+  ventana el portal corre en un marco y WebKit no le deja leer ni escribir cookies desde JavaScript
+  (probado: `document.cookie` vacío aun aceptando cookies de terceros y sin ITP). Un script de
+  Plata en las páginas del portal reemplaza `checkUKSVCookie()` por una que responde que sí
+  (`Lanzador.ScriptDelPortal`). Las cookies que pone el servidor sí se guardan (con la política
+  "aceptar siempre"): el inicio de sesión funciona.
+- **El lanzador** (`Lanzador.cs`): pide `Launcher.aspx` con `&v=3` por el Portero, sigue las
+  redirecciones por JavaScript hasta la página de la app (`Gestion.aspx`, `Administracion.aspx`) y
+  saca el `.xap` y los InitParams (también del HTML escapado dentro de `Sys.UI.Silverlight.Control`).
+  El enlace vence al primer uso ("El enlace ha expirado").
+- **Cookies del portal.** La sesión del alumno viaja en cookies del dominio `.kennedy.edu.ar`
+  que pone el portal (`.GGISECURECOOK`, `GGIReg`…); sin ellas Cuentas Corrientes redirige a
+  `Error/AccesoNoAutorizado.aspx`. Antes de pedir el lanzador, Plata copia al Portero las cookies
+  que el navegador mandaría (`CookiesDelNavegador.cs`, API de cookies de WebKitGTK). Las páginas
+  de las apps agregan otras por `Set-Cookie` (`.EXTRAGGISECURECOOK`, `EXTRATOKENVALUE`, `__RouteID`),
+  que quedan en el Portero. Un segundo inicio de sesión del mismo alumno en paralelo (otro
+  navegador) invalida la sesión para Cuentas Corrientes: `AUTHENTICATION_INVALID_PASSWORD_BAD_USER`.
+- **Una app por pestaña, cada una en su origen** (`plata://app1/`, `plata://app2/`): el host atiende
+  cada origen con su `SesionDeApp` (InitParams, origen del `.xap`, página). El motor corre en un
+  marco y sus mensajes al host pasan por la ventana (`postMessage`), que sabe de qué pestaña
+  vienen; llevan una marca que solo conoce la página de la ventana.
+- **Carga.** Al hacer clic en una tarjeta, un modal muestra "Abriendo aplicación…" (aviso del
+  script del portal) hasta que aparece la pestaña; si falla, el mismo modal da el motivo. Cada pestaña nueva muestra "Abriendo …" hasta que el motor avisa
+  `plata:visible` (la app ya tiene `RootVisual`).
+- **Documentos** (`Documentos.cs`): lo que la app abre con `HtmlPage.Window.Navigate` (reportes,
+  comprobantes, el formulario de pago) se resuelve contra la página de la app. Si el dominio está
+  permitido, se baja por el Portero (con la sesión) y se abre con el programa del sistema; si no,
+  en el navegador del sistema. Solo http/https. Probado: "Pagar" abrió la pasarela de pago.
+
+Limitaciones conocidas:
+
+- Las APIs de WebKit que Photino no expone (esquema seguro, política de cookies, cookies, scripts)
+  se llaman directo a `libwebkit2gtk-4.1`: solo Linux. En macOS hay que resolverlo con WKWebView.
+- `document.cookie` no funciona en el portal enmarcado: si otra función del portal depende de
+  cookies escritas por JavaScript, va a fallar igual que el cartel del visor.
+- Rótulo vertical del menú lateral de GGI ("MENU - …"): con el `RenderTransformOrigin` 0.5,0.5
+  del XAML queda a 80 px y cortado arriba; en Silverlight sale sobre la franja gris, que es lo que
+  dan las cuentas con origen 0,0 (y lo que supone la traslación 18,5 del diseñador). Es el único
+  elemento de GGI con `Effect` + `RenderTransform` + origen no nulo; `CargadorDeXaml.OrigenConEfecto`
+  aplica esa regla solo a esa combinación. Falta confirmarlo con otras apps.
+
+### Red de las apps: reglas de Silverlight
+
+Lo que pide una app en ejecución sigue las reglas de Silverlight (`PoliticaDeAcceso.cs`): su sitio
+de origen siempre; otro sitio, solo si su `/clientaccesspolicy.xml` lo permite (o un
+`/crossdomain.xml` abierto a todos). Los servidores de servicios de la universidad publican
+políticas abiertas a `http://*` (y `servicios1`, también a `https://*`). `--permitir` queda para
+lo que pide el host: portal, lanzador, `.xap` y documentos.
+
+### Pendiente
+
+- `KeepAliveWebSession`: mantener viva la sesión ASP.NET de la página.
+- macOS ([plan](../macos.md)).

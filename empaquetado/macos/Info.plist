@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>MiPortal App</string>
+  <key>CFBundleDisplayName</key><string>Universidad Kennedy MiPortal App</string>
+  <key>CFBundleIdentifier</key><string>io.github.juaniveltri.ukennedy-miportal-app</string>
+  <key>CFBundleVersion</key><string>__VERSION__</string>
+  <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+  <key>CFBundleExecutable</key><string>Plata.Host</string>
+  <key>CFBundleIconFile</key><string>icono</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+  <key>LSApplicationCategoryType</key><string>public.app-category.education</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSHumanReadableCopyright</key><string>Proyecto no oficial y de código abierto (MIT).</string>
+</dict>
+</plist>
