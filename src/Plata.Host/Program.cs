@@ -15,6 +15,8 @@ var documentos = new Documentos(portero.Permitido, portero.TraerDocumentoAsync,
     a => Process.Start(new ProcessStartInfo(a) { UseShellExecute = true }),
     Path.Combine(Path.GetTempPath(), "plata-documentos"));
 var diagnostico = args.Contains("--diagnostico");
+// La red de las apps sigue las reglas de Silverlight (clientaccesspolicy.xml).
+var politica = new PoliticaDeAcceso(portero.TraerPoliticaAsync);
 
 // Portal: una ventana con pestañas. La primera es el sitio desde el que se abren las apps (p. ej.
 // MiPortal); el usuario inicia sesión ahí. Cuando el portal entrega el enlace de una app (uksv:),
@@ -34,7 +36,7 @@ void AbrirApp()
         Console.WriteLine($"app {lanzamiento.NombreXap}: {portero.AgregarCookies(lanzamiento.Cookies)} cookies de sesión");
     var deLanzamiento = lanzamiento is not null ? SesionDeApp.Para(lanzamiento, motor, portero, documentos) : null;
     // Los argumentos sueltos reemplazan a lo que diga el lanzamiento.
-    var sesion = new SesionDeApp(motor, portero, documentos)
+    var sesion = new SesionDeApp(motor, portero, documentos, politica)
     {
         Xap = ArgOf(args, "--xap") ?? deLanzamiento?.Xap,
         InitParams = ArgOf(args, "--init-params") is { } f ? File.ReadAllText(f).Trim() : deLanzamiento?.InitParams ?? "",
@@ -119,7 +121,7 @@ void AbrirPortal(Uri inicio)
                                           $"agregadas {portero.AgregarCookies(delNavegador)}");
                         var l = await lanzador.LanzarAsync(url);
                         var id = idPorXap.GetOrAdd(l.NombreXap, _ => "app" + (idPorXap.Count + 1));
-                        var sesion = SesionDeApp.Para(l, motor, portero, documentos, diagnostico);
+                        var sesion = SesionDeApp.Para(l, motor, portero, documentos, politica, diagnostico);
                         sesiones[id] = sesion;
                         Console.WriteLine($"lanzada {l.NombreXap} en la pestaña {id} ({l.Titulo})");
                         AVentana(new { tipo = "app", id, titulo = l.TituloCorto, url = sesion.Direccion(id) });
