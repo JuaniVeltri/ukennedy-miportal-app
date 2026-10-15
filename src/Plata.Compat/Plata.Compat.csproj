@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Reemplazos de API para las apps traducidas: el traductor redirige a estos tipos
+       lo que en .NET moderno u OpenSilver falta o se comporta distinto que en Silverlight. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenSilver" Version="$(PlataOpenSilverVersion)" />
+    <!-- Cliente WCF de .NET (BasicHttpBinding, ChannelFactory): OpenSilver trae solo Primitives. -->
+    <PackageReference Include="System.ServiceModel.Http" Version="8.1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Plata.Motor.Tests" />
+  </ItemGroup>
+</Project>

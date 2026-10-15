@@ -5,4 +5,7 @@
   <ItemGroup>
     <PackageReference Include="Mono.Cecil" Version="$(PlataCecilVersion)" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Plata.Compat\Plata.Compat.csproj" />
+  </ItemGroup>
 </Project>

@@ -6,6 +6,24 @@
     <title>Plata</title>
     <base href="/" />
     <script>
+        // En la ventana de Plata con pestañas, la app corre en un marco: sus mensajes al host pasan
+        // por la ventana, que sabe de qué pestaña vienen.
+        (function () {
+            if (window.parent === window) return;
+            var oyentes = [];
+            window.addEventListener('message', function (e) {
+                if (e.source === window.parent && e.data && typeof e.data.plata === 'string')
+                    oyentes.forEach(function (o) { o(e.data.plata); });
+            });
+            var externo = {
+                sendMessage: function (m) { window.parent.postMessage({ plata: m }, '*'); },
+                receiveMessage: function (o) { oyentes.push(o); }
+            };
+            try { Object.defineProperty(window, 'external', { value: externo, configurable: true, writable: true }); }
+            catch (e) { window.external = externo; }
+        })();
+    </script>
+    <script>
         (function () {
             const style = document.createElement('link');
             style.setAttribute('rel', 'stylesheet');
