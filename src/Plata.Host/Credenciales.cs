@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: MIT
 using System.Runtime.InteropServices;
-using System.Text;
 using System.Text.Json;
 
 namespace Plata.Host;
@@ -10,25 +9,26 @@ public sealed record Cuenta(string Usuario, string Clave);
 
 /// <summary>
 /// "Recordarme": guarda la cuenta del portal en el llavero del sistema, nunca en un archivo de la
-/// app. En Linux, el servicio de secretos del escritorio (GNOME Keyring, KWallet) con libsecret; en
-/// macOS, el Llavero. Todo queda en la computadora. En otros sistemas no está disponible.
+/// app. En Linux, el servicio de secretos del escritorio (GNOME Keyring, KWallet) con libsecret. Todo
+/// queda en la computadora. En macOS no está disponible: el Llavero le pide permiso al usuario cada
+/// vez que una versión de la app con otra firma lee la cuenta, y no se guarda en ningún otro lado.
+/// En otros sistemas tampoco está disponible.
 /// </summary>
 public static class Credenciales
 {
     private const string Aplicacion = "ukennedy-miportal-app";
 
-    public static bool Disponible => OperatingSystem.IsMacOS() || (OperatingSystem.IsLinux() && Linux.Disponible);
+    public static bool Disponible => OperatingSystem.IsLinux() && Linux.Disponible;
 
     public static void Guardar(string sitio, Cuenta cuenta)
     {
         var datos = JsonSerializer.Serialize(new { usuario = cuenta.Usuario, clave = cuenta.Clave });
-        if (OperatingSystem.IsMacOS()) Mac.Guardar(sitio, datos);
-        else if (OperatingSystem.IsLinux()) Linux.Guardar(sitio, datos);
+        if (OperatingSystem.IsLinux()) Linux.Guardar(sitio, datos);
     }
 
     public static Cuenta? Leer(string sitio)
     {
-        var datos = OperatingSystem.IsMacOS() ? Mac.Leer(sitio) : OperatingSystem.IsLinux() ? Linux.Leer(sitio) : null;
+        var datos = OperatingSystem.IsLinux() ? Linux.Leer(sitio) : null;
         if (datos is null) return null;
         try
         {
@@ -40,8 +40,7 @@ public static class Credenciales
 
     public static void Olvidar(string sitio)
     {
-        if (OperatingSystem.IsMacOS()) Mac.Olvidar(sitio);
-        else if (OperatingSystem.IsLinux()) Linux.Olvidar(sitio);
+        if (OperatingSystem.IsLinux()) Linux.Olvidar(sitio);
     }
 
     // libsecret, con las funciones que reciben los atributos en una tabla (no variádicas).
@@ -119,57 +118,5 @@ public static class Credenciales
         [DllImport(GLib)] private static extern void g_hash_table_insert(IntPtr tabla, IntPtr clave, IntPtr valor);
         [DllImport(GLib)] private static extern void g_hash_table_unref(IntPtr tabla);
         [DllImport(GLib)] private static extern void g_error_free(IntPtr error);
-    }
-
-    // Llavero de macOS: contraseña genérica (servicio = la app, cuenta = el sitio).
-    private static class Mac
-    {
-        private const string Security = "/System/Library/Frameworks/Security.framework/Security";
-        private const string CoreFoundation = "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation";
-        private const int NoEncontrado = -25300;
-
-        public static void Guardar(string sitio, string datos)
-        {
-            var bytes = Encoding.UTF8.GetBytes(datos);
-            var (s, c) = (Encoding.UTF8.GetBytes(Aplicacion), Encoding.UTF8.GetBytes(sitio));
-            if (SecKeychainFindGenericPassword(IntPtr.Zero, (uint)s.Length, s, (uint)c.Length, c, out _, out var viejos, out var item) == 0)
-            {
-                SecKeychainItemFreeContent(IntPtr.Zero, viejos);
-                var r = SecKeychainItemModifyAttributesAndData(item, IntPtr.Zero, (uint)bytes.Length, bytes);
-                CFRelease(item);
-                if (r != 0) throw new InvalidOperationException($"no se pudo actualizar el llavero ({r})");
-                return;
-            }
-            var res = SecKeychainAddGenericPassword(IntPtr.Zero, (uint)s.Length, s, (uint)c.Length, c, (uint)bytes.Length, bytes, IntPtr.Zero);
-            if (res != 0) throw new InvalidOperationException($"no se pudo guardar en el llavero ({res})");
-        }
-
-        public static string? Leer(string sitio)
-        {
-            var (s, c) = (Encoding.UTF8.GetBytes(Aplicacion), Encoding.UTF8.GetBytes(sitio));
-            var r = SecKeychainFindGenericPassword(IntPtr.Zero, (uint)s.Length, s, (uint)c.Length, c, out var largo, out var datos, out var item);
-            if (r == NoEncontrado) return null;
-            if (r != 0) throw new InvalidOperationException($"no se pudo leer el llavero ({r})");
-            try { return Marshal.PtrToStringUTF8(datos, (int)largo); }
-            finally { SecKeychainItemFreeContent(IntPtr.Zero, datos); CFRelease(item); }
-        }
-
-        public static void Olvidar(string sitio)
-        {
-            var (s, c) = (Encoding.UTF8.GetBytes(Aplicacion), Encoding.UTF8.GetBytes(sitio));
-            if (SecKeychainFindGenericPassword(IntPtr.Zero, (uint)s.Length, s, (uint)c.Length, c, out _, out var datos, out var item) != 0) return;
-            SecKeychainItemFreeContent(IntPtr.Zero, datos);
-            SecKeychainItemDelete(item);
-            CFRelease(item);
-        }
-
-        [DllImport(Security)] private static extern int SecKeychainAddGenericPassword(IntPtr llavero, uint largoServicio, byte[] servicio,
-            uint largoCuenta, byte[] cuenta, uint largoClave, byte[] clave, IntPtr item);
-        [DllImport(Security)] private static extern int SecKeychainFindGenericPassword(IntPtr llaveros, uint largoServicio, byte[] servicio,
-            uint largoCuenta, byte[] cuenta, out uint largoClave, out IntPtr clave, out IntPtr item);
-        [DllImport(Security)] private static extern int SecKeychainItemModifyAttributesAndData(IntPtr item, IntPtr atributos, uint largo, byte[] datos);
-        [DllImport(Security)] private static extern int SecKeychainItemFreeContent(IntPtr atributos, IntPtr datos);
-        [DllImport(Security)] private static extern int SecKeychainItemDelete(IntPtr item);
-        [DllImport(CoreFoundation)] private static extern void CFRelease(IntPtr objeto);
     }
 }
