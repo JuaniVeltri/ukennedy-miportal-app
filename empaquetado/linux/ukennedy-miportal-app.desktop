@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Universidad Kennedy MiPortal App (no oficial)
+GenericName=MiPortal (Académico y Cuentas Corrientes)
+Comment=Abre Académico y Cuentas Corrientes de MiPortal en Linux. No oficial, de código abierto.
+Exec=ukennedy-miportal-app
+Icon=ukennedy-miportal-app
+Terminal=false
+Categories=Education;Network;
+Keywords=Kennedy;MiPortal;Académico;Cuentas Corrientes;Silverlight;
+StartupWMClass=Plata.Host
