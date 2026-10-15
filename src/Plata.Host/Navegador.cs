@@ -20,6 +20,7 @@ public static class Navegador
         else if (OperatingSystem.IsMacOS())
         {
             WebKitMac.PermitirCookiesDelPortal();
+            WebKitMac.AceptarCookiesDeTerceros();
             WebKitMac.AgregarScript(scripts);
         }
     }

@@ -30,6 +30,21 @@ internal static class WebKitMac
             EnviarConBool(datos, opcion, false);
         });
 
+    /// <summary>
+    /// Acepta las cookies de todos los sitios, como en Linux (ACCEPT_ALWAYS). Por defecto WKWebView
+    /// solo acepta las del dominio del documento principal, que es la ventana (plata://plata/): las
+    /// del portal, que corre en un marco, se descartan y el inicio de sesión vuelve sin sesión.
+    /// </summary>
+    public static void AceptarCookiesDeTerceros()
+        => Intentar("aceptar cookies de terceros", () =>
+        {
+            var almacen = Enviar(Enviar(Configuracion(), Sel("websiteDataStore")), Sel("httpCookieStore"));
+            var opcion = Sel("_setCookieAcceptPolicy:completionHandler:");
+            if (!EnviarBool(almacen, Sel("respondsToSelector:"), opcion))
+                throw new InvalidOperationException("esta versión de WebKit no tiene _setCookieAcceptPolicy:");
+            EnviarPolitica(almacen, opcion, 0 /* NSHTTPCookieAcceptPolicyAlways */, BloqueSinRespuesta.Value);
+        });
+
     /// <summary>Agrega un script que corre en cada página y marco de la ventana (al terminar de cargar).</summary>
     public static void AgregarScript(string fuente)
         => Intentar("script del portal", () =>
@@ -90,9 +105,19 @@ internal static class WebKitMac
         if (Pendientes.TryDequeue(out var tcs)) tcs.TrySetResult(lista);
     };
 
-    // Un bloque de Objective-C global (no se copia ni se libera) que llama a AlRecibirCookies.
+    private static readonly Lazy<IntPtr> BloqueDeCookies = new(() => BloqueGlobal(AlRecibirCookies));
+
+    // WebKit llama siempre al bloque de respuesta de _setCookieAcceptPolicy: (no admite nil).
+    [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
+    private delegate void InvocarBloqueVacio(IntPtr bloque);
+
+    private static readonly InvocarBloqueVacio AlAplicarPolitica = _ => Console.WriteLine("macOS: aceptar cookies de terceros: aplicado");
+    private static readonly Lazy<IntPtr> BloqueSinRespuesta = new(() => BloqueGlobal(AlAplicarPolitica));
+
+    // Un bloque de Objective-C global (no se copia ni se libera) que llama al delegado, que tiene que
+    // seguir vivo (los de esta clase son estáticos).
     // Estructura: isa, flags, reservado, invoke, descriptor; descriptor: reservado, tamaño.
-    private static readonly Lazy<IntPtr> BloqueDeCookies = new(() =>
+    private static IntPtr BloqueGlobal(Delegate invocar)
     {
         var descriptor = Marshal.AllocHGlobal(16);
         Marshal.WriteInt64(descriptor, 0, 0);
@@ -101,10 +126,10 @@ internal static class WebKitMac
         Marshal.WriteIntPtr(bloque, 0, NativeLibrary.GetExport(NativeLibrary.Load("/usr/lib/libSystem.B.dylib"), "_NSConcreteGlobalBlock"));
         Marshal.WriteInt32(bloque, 8, 1 << 28); // BLOCK_IS_GLOBAL
         Marshal.WriteInt32(bloque, 12, 0);
-        Marshal.WriteIntPtr(bloque, 16, Marshal.GetFunctionPointerForDelegate(AlRecibirCookies));
+        Marshal.WriteIntPtr(bloque, 16, Marshal.GetFunctionPointerForDelegate(invocar));
         Marshal.WriteIntPtr(bloque, 24, descriptor);
         return bloque;
-    });
+    }
 
     // La configuración de la vista de la ventana (WKWebView, dentro del contentView de la ventana).
     private static IntPtr Configuracion()
@@ -166,6 +191,8 @@ internal static class WebKitMac
     private static extern bool EnviarBool0(IntPtr receptor, IntPtr selector);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")]
     private static extern void EnviarConBool(IntPtr receptor, IntPtr selector, [MarshalAs(UnmanagedType.I1)] bool valor);
+    [DllImport(ObjC, EntryPoint = "objc_msgSend")]
+    private static extern void EnviarPolitica(IntPtr receptor, IntPtr selector, nuint politica, IntPtr bloque);
     [DllImport(ObjC, EntryPoint = "objc_msgSend")]
     private static extern IntPtr EnviarScript(IntPtr receptor, IntPtr selector, IntPtr fuente, nint momento, [MarshalAs(UnmanagedType.I1)] bool soloPrincipal);
 }
